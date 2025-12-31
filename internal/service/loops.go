@@ -190,7 +190,9 @@ func StartControllerManager(myApp fyne.App, conf *config.Config) *container.AppT
 			for _, path := range foundPaths {
 				if _, exists := activeControllers[path]; !exists {
 					ctx, cancel := context.WithCancel(context.Background())
-					newTab := ui.CreateNewControllerTab(path, conf)
+					mac := GetControllerMAC(path)
+					ctrlConf := conf.GetControllerConfig(mac)
+					newTab := ui.CreateNewControllerTab(path, conf, ctrlConf)
 					newTab.CancelFunc = cancel
 					activeControllers[path] = newTab
 

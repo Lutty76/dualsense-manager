@@ -19,7 +19,7 @@ type ControllerTab struct {
 	CancelFunc   context.CancelFunc
 }
 
-func CreateNewControllerTab(path string, conf *config.Config) *ControllerTab {
+func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.ControllerConfig) *ControllerTab {
 	state := &AppState{
 		BatteryValue:        binding.NewFloat(),
 		BatteryText:         binding.NewString(),
@@ -31,9 +31,10 @@ func CreateNewControllerTab(path string, conf *config.Config) *ControllerTab {
 		LedPlayerPreference: binding.NewInt(),
 		LedRGBPreference:    binding.NewInt(),
 	}
-	state.DeadzoneValue.Set(float64(conf.Deadzone))
-	state.LedRGBPreference.Set(conf.LedRGBPreference)
-	state.LedPlayerPreference.Set(conf.LedPlayerPreference)
+
+	state.DeadzoneValue.Set(float64(ctrlConf.Deadzone))
+	state.LedRGBPreference.Set(ctrlConf.LedRGBPreference)
+	state.LedPlayerPreference.Set(ctrlConf.LedPlayerPreference)
 	initialValue := fmt.Sprintf("%d min", conf.IdleMinutes)
 	if conf.IdleMinutes == 0 {
 		initialValue = "Jamais"

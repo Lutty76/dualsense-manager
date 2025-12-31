@@ -8,12 +8,45 @@ import (
 )
 
 type Config struct {
-	IdleMinutes         int    `yaml:"idle_minutes"`
-	BatteryAlert        int    `yaml:"battery_alert"`
-	LastMAC             string `yaml:"last_mac"`
-	Deadzone            int    `yaml:"deadzone"`
-	LedPlayerPreference int    `yaml:"led_player"`
-	LedRGBPreference    int    `yaml:"led_indicator"`
+	IdleMinutes  int `yaml:"idle_minutes"`
+	BatteryAlert int `yaml:"battery_alert"`
+	// Per-controller configuration keyed by MAC address
+	Controllers map[string]ControllerConfig `yaml:"controllers,omitempty"`
+}
+
+type ControllerConfig struct {
+	Deadzone            int `yaml:"deadzone,omitempty"`
+	LedPlayerPreference int `yaml:"led_player,omitempty"`
+	LedRGBPreference    int `yaml:"led_indicator,omitempty"`
+}
+
+// GetControllerConfig returns the configuration for a specific controller MAC.
+// If a per-MAC config is not present or fields are zero, fall back to top-level defaults.
+func (c *Config) GetControllerConfig(mac string) *ControllerConfig {
+	// Start with reasonable defaults
+	res := &ControllerConfig{
+		Deadzone:            1500,
+		LedPlayerPreference: 1,
+		LedRGBPreference:    0,
+	}
+
+	if c.Controllers == nil {
+		return res
+	}
+
+	if cc, ok := c.Controllers[mac]; ok {
+		if cc.Deadzone != 0 {
+			res.Deadzone = cc.Deadzone
+		}
+		if cc.LedPlayerPreference != 0 {
+			res.LedPlayerPreference = cc.LedPlayerPreference
+		}
+		if cc.LedRGBPreference != 0 {
+			res.LedRGBPreference = cc.LedRGBPreference
+		}
+	}
+
+	return res
 }
 
 func getConfigPath() string {
@@ -38,11 +71,8 @@ func Load() *Config {
 	path := getConfigPath()
 
 	conf := &Config{
-		IdleMinutes:         10,
-		BatteryAlert:        15,
-		Deadzone:            1000,
-		LedPlayerPreference: 0,
-		LedRGBPreference:    0, // Couleur par défaut
+		IdleMinutes:  10,
+		BatteryAlert: 15,
 	}
 
 	data, err := os.ReadFile(path)
