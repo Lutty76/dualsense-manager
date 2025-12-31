@@ -22,6 +22,7 @@ type AppState struct {
 	DeadzoneValue       binding.Float
 	LedPlayerPreference binding.Int
 	LedRGBPreference    binding.Int
+	LedRGBStaticColor   binding.String
 }
 
 const (
@@ -149,7 +150,51 @@ func CreateContent(conf *config.Config, state *AppState) fyne.CanvasObject {
 
 	namesRgb := []string{rgbOptions[0], rgbOptions[1], rgbOptions[2]}
 
-	rgbSelect := widget.NewSelect(namesRgb, func(selected string) {
+	rgbSelect := widget.NewSelect(namesRgb, nil)
+
+	// initialize state bindings from controller config only when MAC present
+	if ctrlConf != nil {
+		_ = state.DeadzoneValue.Set(float64(ctrlConf.Deadzone))
+		_ = state.LedPlayerPreference.Set(ctrlConf.LedPlayerPreference)
+		_ = state.LedRGBPreference.Set(ctrlConf.LedRGBPreference)
+		// store static color binding without leading '#'
+		_ = state.LedRGBStaticColor.Set(strings.TrimPrefix(ctrlConf.LedRGBStatic, "#"))
+	}
+	currentID, _ := state.LedPlayerPreference.Get()
+	ledSelect.SetSelected(playerOptions[currentID])
+	currentIDRGB, _ := state.LedRGBPreference.Get()
+	rgbSelect.SetSelected(rgbOptions[currentIDRGB])
+
+	staticColorEntry := widget.NewEntry()
+	staticColorEntry.SetPlaceHolder("FFFFFF")
+	// initialize from state binding when available (set by CreateNewControllerTab)
+	if v, err := state.LedRGBStaticColor.Get(); err == nil && v != "" {
+		staticColorEntry.SetText(v)
+	} else if ctrlConf != nil && ctrlConf.LedRGBStatic != "" {
+		staticColorEntry.SetText(strings.TrimPrefix(ctrlConf.LedRGBStatic, "#"))
+	}
+	staticColorEntry.OnChanged = func(s string) {
+		if mac := getMac(); mac != "" {
+			if conf.Controllers == nil {
+				conf.Controllers = map[string]config.ControllerConfig{}
+			}
+			cc := conf.Controllers[mac]
+			cc.LedRGBStatic = "#" + s
+			conf.Controllers[mac] = cc
+			config.Save(conf)
+		}
+		state.LedRGBStaticColor.Set(s)
+	}
+	staticColorContainer := container.NewBorder(nil, nil, widget.NewLabel("Static Color Hex (RRGGBB): "), nil, staticColorEntry)
+
+	if currentIDRGB == RGBModeStatic {
+		staticColorContainer.Show()
+	} else {
+		staticColorContainer.Hide()
+	}
+
+	// ensure rgbSelect shows or hides the static-color entry when changed
+	rgbSelect.OnChanged = func(selected string) {
 		for id, name := range rgbOptions {
 			if name == selected {
 				state.LedRGBPreference.Set(id)
@@ -162,23 +207,15 @@ func CreateContent(conf *config.Config, state *AppState) fyne.CanvasObject {
 					conf.Controllers[mac] = cc
 					config.Save(conf)
 				}
+				if id == RGBModeStatic {
+					staticColorContainer.Show()
+				} else {
+					staticColorContainer.Hide()
+				}
 				break
 			}
 		}
-	})
-	// no direct size calls; we'll let containers expand the selects
-
-	// initialize state bindings from controller config only when MAC present
-	if ctrlConf != nil {
-		_ = state.DeadzoneValue.Set(float64(ctrlConf.Deadzone))
-		_ = state.LedPlayerPreference.Set(ctrlConf.LedPlayerPreference)
-		_ = state.LedRGBPreference.Set(ctrlConf.LedRGBPreference)
 	}
-	currentID, _ := state.LedPlayerPreference.Get()
-	ledSelect.SetSelected(playerOptions[currentID])
-	currentIDRGB, _ := state.LedRGBPreference.Get()
-	rgbSelect.SetSelected(rgbOptions[currentIDRGB])
-
 	return container.NewVBox(
 		widget.NewLabelWithData(state.BatteryText),
 		widget.NewProgressBarWithData(state.BatteryValue),
@@ -186,6 +223,7 @@ func CreateContent(conf *config.Config, state *AppState) fyne.CanvasObject {
 		widget.NewLabelWithData(state.MacText),
 		container.NewBorder(nil, nil, widget.NewLabel("Player LED :"), nil, ledSelect),
 		container.NewBorder(nil, nil, widget.NewLabel("RGB LED :"), nil, rgbSelect),
+		staticColorContainer,
 		deadzoneLabel,
 		deadzoneSlider,
 		widget.NewSeparator(),

@@ -4,6 +4,7 @@ import (
 	"context"
 	"dualsense/internal/config"
 	"fmt"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -30,11 +31,16 @@ func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.C
 		DeadzoneValue:       binding.NewFloat(),
 		LedPlayerPreference: binding.NewInt(),
 		LedRGBPreference:    binding.NewInt(),
+		LedRGBStaticColor:   binding.NewString(),
 	}
 
 	state.DeadzoneValue.Set(float64(ctrlConf.Deadzone))
 	state.LedRGBPreference.Set(ctrlConf.LedRGBPreference)
 	state.LedPlayerPreference.Set(ctrlConf.LedPlayerPreference)
+	// initialize static RGB color binding without leading '#'
+	if ctrlConf.LedRGBStatic != "" {
+		state.LedRGBStaticColor.Set(strings.TrimPrefix(ctrlConf.LedRGBStatic, "#"))
+	}
 	initialValue := fmt.Sprintf("%d min", conf.IdleMinutes)
 	if conf.IdleMinutes == 0 {
 		initialValue = "Jamais"

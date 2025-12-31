@@ -90,7 +90,9 @@ func StartBatteryLoop(ctx context.Context, app fyne.App, state *ui.AppState, pat
 				case ui.RGBModeBattery:
 					SetBatteryColor(path, float64(level))
 				case ui.RGBModeStatic:
-					setLightbarRGB(path, 0, 50, 255)
+					ctrlConf := config.Load().GetControllerConfig(mac)
+					r, g, b := hexToRGB(ctrlConf.LedRGBStatic)
+					setLightbarRGB(path, r, g, b)
 
 				case ui.RGBModeOff:
 					setLightbarRGB(path, 0, 0, 0)
@@ -242,4 +244,15 @@ func getShortMAC(path string) string {
 		return fullMAC[len(fullMAC)-5:]
 	}
 	return filepath.Base(path)
+}
+
+func hexToRGB(hexStr string) (int, int, int) {
+	hexStr = strings.TrimPrefix(hexStr, "#")
+	if len(hexStr) != 6 {
+		return 0, 0, 0
+	}
+	r, _ := strconv.ParseInt(hexStr[0:2], 16, 0)
+	g, _ := strconv.ParseInt(hexStr[2:4], 16, 0)
+	b, _ := strconv.ParseInt(hexStr[4:6], 16, 0)
+	return int(r), int(g), int(b)
 }

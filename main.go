@@ -3,6 +3,7 @@ package main
 import (
 	"dualsense/internal/config"
 	"dualsense/internal/service"
+	"flag"
 	"os"
 
 	"fyne.io/fyne/v2"
@@ -11,6 +12,10 @@ import (
 )
 
 func main() {
+
+	hidePtr := flag.Bool("hide", false, "Start the application hidden in the system tray")
+	flag.Parse()
+
 	conf := config.Load()
 	myApp := app.NewWithID("com.dualsense.manager")
 	myWindow := myApp.NewWindow("DualSense Manager")
@@ -35,6 +40,12 @@ func main() {
 	controllerTabs := service.StartControllerManager(myApp, conf)
 
 	myWindow.SetContent(controllerTabs)
-	myWindow.Resize(fyne.NewSize(400, 300))
-	myWindow.ShowAndRun()
+	myWindow.Resize(fyne.NewSize(300, 300))
+
+	if *hidePtr {
+		// start the application hidden: run app loop without showing the window
+		myApp.Run()
+	} else {
+		myWindow.ShowAndRun()
+	}
 }
