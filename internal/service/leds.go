@@ -137,14 +137,11 @@ func SetBatteryLeds(jsPath string, percent float64) {
 	}
 }
 
-func SetPlayerNumber(jsPath string) {
+func SetPlayerNumber(jsPath string, id int) {
 	ledBase := getLedPath(jsPath)
-	jsName := filepath.Base(jsPath) // "js0", "js1"...
 
-	var num int
-	fmt.Sscanf(jsName, "js%d", &num)
-	playerNum := num
-
+	playerNum := id
+	// Reset initial
 	p15, p24, p3 := "0", "0", "0"
 
 	switch playerNum {
@@ -176,7 +173,10 @@ func applyLed(basePath, ledName, value string) {
 
 	path := matches[0]
 
-	_ = os.WriteFile(filepath.Join(path, "brightness"), []byte(value), 0644)
+	err := os.WriteFile(filepath.Join(path, "brightness"), []byte(value), 0644)
+	if err != nil {
+		fmt.Println("Error writing LED value:", err)
+	}
 
 }
 
@@ -205,7 +205,13 @@ func setLightbarRGB(jsPath string, r, g, b int) {
 
 	path := matches[0]
 	colorStr := fmt.Sprintf("%d %d %d", r, g, b)
-	_ = os.WriteFile(filepath.Join(path, "multi_intensity"), []byte(colorStr), 0644)
+	err := os.WriteFile(filepath.Join(path, "multi_intensity"), []byte(colorStr), 0644)
+	if err != nil {
+		fmt.Println("Error writing RGB value:", err)
+	}
 
-	_ = os.WriteFile(filepath.Join(path, "brightness"), []byte("255"), 0644)
+	err = os.WriteFile(filepath.Join(path, "brightness"), []byte("255"), 0644)
+	if err != nil {
+		fmt.Println("Error writing brightness value:", err)
+	}
 }

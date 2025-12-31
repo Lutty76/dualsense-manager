@@ -4,6 +4,7 @@ import (
 	"context"
 	"dualsense/internal/config"
 	"fmt"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -19,8 +20,9 @@ type ControllerTab struct {
 	CancelFunc   context.CancelFunc
 }
 
-func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.ControllerConfig) *ControllerTab {
+func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.ControllerConfig, id int) *ControllerTab {
 	state := &AppState{
+		ControllerId:        binding.NewInt(),
 		BatteryValue:        binding.NewFloat(),
 		BatteryText:         binding.NewString(),
 		StateText:           binding.NewString(),
@@ -30,11 +32,17 @@ func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.C
 		DeadzoneValue:       binding.NewFloat(),
 		LedPlayerPreference: binding.NewInt(),
 		LedRGBPreference:    binding.NewInt(),
+		LedRGBStaticColor:   binding.NewString(),
 	}
 
+	state.ControllerId.Set(id)
 	state.DeadzoneValue.Set(float64(ctrlConf.Deadzone))
 	state.LedRGBPreference.Set(ctrlConf.LedRGBPreference)
 	state.LedPlayerPreference.Set(ctrlConf.LedPlayerPreference)
+	// initialize static RGB color binding without leading '#'
+	if ctrlConf.LedRGBStatic != "" {
+		state.LedRGBStaticColor.Set(strings.TrimPrefix(ctrlConf.LedRGBStatic, "#"))
+	}
 	initialValue := fmt.Sprintf("%d min", conf.IdleMinutes)
 	if conf.IdleMinutes == 0 {
 		initialValue = "Jamais"

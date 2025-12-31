@@ -15,9 +15,10 @@ type Config struct {
 }
 
 type ControllerConfig struct {
-	Deadzone            int `yaml:"deadzone,omitempty"`
-	LedPlayerPreference int `yaml:"led_player,omitempty"`
-	LedRGBPreference    int `yaml:"led_indicator,omitempty"`
+	Deadzone            int    `yaml:"deadzone,omitempty"`
+	LedPlayerPreference int    `yaml:"led_player,omitempty"`
+	LedRGBPreference    int    `yaml:"led_indicator,omitempty"`
+	LedRGBStatic        string `yaml:"led_rgb_static,omitempty"`
 }
 
 // GetControllerConfig returns the configuration for a specific controller MAC.
@@ -43,6 +44,9 @@ func (c *Config) GetControllerConfig(mac string) *ControllerConfig {
 		}
 		if cc.LedRGBPreference != 0 {
 			res.LedRGBPreference = cc.LedRGBPreference
+		}
+		if cc.LedRGBStatic != "" {
+			res.LedRGBStatic = cc.LedRGBStatic
 		}
 	}
 
