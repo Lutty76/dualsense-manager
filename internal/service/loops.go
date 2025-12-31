@@ -17,19 +17,19 @@ import (
 )
 
 func StartBatteryLoop(ctx context.Context, app fyne.App, state *ui.AppState, path string) {
-	var animCancel context.CancelFunc // Pour arrêter l'animation proprement
+	var animCancel context.CancelFunc = func() {} // no-op cancel to satisfy linters
+	var animActive bool                           // true when a real cancel is set
 
 	// Au cas où la goroutine principale s'arrête, on nettoie l'animation
 	defer func() {
-		if animCancel != nil {
-			animCancel()
-		}
+		animCancel()
 		fmt.Println("Stopping battery loop for controller at path:", path)
 	}()
 
 	for {
 		select {
 		case <-ctx.Done():
+			animCancel()
 			return
 		default:
 			level, err := GetActualBatteryLevel(path)
@@ -57,9 +57,10 @@ func StartBatteryLoop(ctx context.Context, app fyne.App, state *ui.AppState, pat
 				(ledPref == ui.PlayerModeBattery || rgbPref == ui.RGBModeBattery)
 
 			if shouldAnimate {
-				if animCancel == nil {
+				if !animActive {
 					var animCtx context.Context
 					animCtx, animCancel = context.WithCancel(ctx)
+					animActive = true
 
 					// On lance les animations sélectivement selon les préférences
 					if ledPref == ui.PlayerModeBattery {
@@ -71,9 +72,10 @@ func StartBatteryLoop(ctx context.Context, app fyne.App, state *ui.AppState, pat
 				}
 			} else {
 				// 2. Pas d'animation : on arrête tout et on applique le fixe
-				if animCancel != nil {
+				if animActive {
 					animCancel()
-					animCancel = nil
+					animCancel = func() {}
+					animActive = false
 				}
 
 				// --- Gestion LEDS PLAYER ---
@@ -100,63 +102,64 @@ func StartBatteryLoop(ctx context.Context, app fyne.App, state *ui.AppState, pat
 	}
 }
 func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan chan time.Time, path string) {
-	go func() {
-		lastActivityTime := time.Now()
-		ticker := time.NewTicker(1 * time.Second)
-		for {
-			select {
-			case <-ctx.Done(): // Si on annule le contexte, on arrête TOUT
-				return
-			case t := <-activityChan:
-				lastActivityTime = t
-				state.LastActivityBinding.Set("In use")
-			case <-ticker.C:
-				status, _ := state.StateText.Get()
 
-				if strings.Contains(status, "not found") || strings.Contains(status, "Recherche") {
-					lastActivityTime = time.Now()
-					state.LastActivityBinding.Set("Disconnected")
-					continue
-				}
-				diff := time.Since(lastActivityTime)
+	lastActivityTime := time.Now()
+	ticker := time.NewTicker(1 * time.Second)
+	for {
+		select {
+		case <-ctx.Done(): // Si on annule le contexte, on arrête TOUT
+			fmt.Println("Stopping activity loop for controller at path:", path)
+			return
+		case t := <-activityChan:
+			lastActivityTime = t
+			state.LastActivityBinding.Set("In use")
+		case <-ticker.C:
+			status, _ := state.StateText.Get()
 
-				currentChoice, _ := state.SelectedDuration.Get()
+			if strings.Contains(status, "not found") || strings.Contains(status, "Recherche") {
+				lastActivityTime = time.Now()
+				state.LastActivityBinding.Set("Disconnected")
+				continue
+			}
+			diff := time.Since(lastActivityTime)
 
-				if currentChoice == "" {
-					continue
-				}
+			currentChoice, _ := state.SelectedDuration.Get()
 
-				if currentChoice == "Jamais" {
-					state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s (Auto-off Disabled)", diff.Truncate(time.Second)))
-					continue
-				}
-				if strings.Contains(status, "Charging") || strings.Contains(status, "Full") {
-					state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s (disabled due to charging)", diff.Truncate(time.Second)))
-					continue
-				}
+			if currentChoice == "" {
+				continue
+			}
 
-				parts := strings.Split(currentChoice, " ")
-				minutes, err := strconv.Atoi(parts[0])
-				if err != nil || minutes <= 0 {
-					continue
-				}
+			if currentChoice == "Jamais" {
+				state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s (Auto-off Disabled)", diff.Truncate(time.Second)))
+				continue
+			}
+			if strings.Contains(status, "Charging") || strings.Contains(status, "Full") {
+				state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s (disabled due to charging)", diff.Truncate(time.Second)))
+				continue
+			}
 
-				limit := time.Duration(minutes) * time.Minute
-				state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s / %s", diff.Truncate(time.Second), currentChoice))
+			parts := strings.Split(currentChoice, " ")
+			minutes, err := strconv.Atoi(parts[0])
+			if err != nil || minutes <= 0 {
+				continue
+			}
 
-				if diff > limit {
-					fmt.Println("Auto disconnect !")
-					mac := GetControllerMAC(path)
-					if mac != "" {
-						err := DisconnectDualSenseNative(mac)
-						if err != nil {
-							fmt.Println("Fail D-Bus:", err)
-						}
+			limit := time.Duration(minutes) * time.Minute
+			state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s / %s", diff.Truncate(time.Second), currentChoice))
+
+			if diff > limit {
+				fmt.Println("Auto disconnect !")
+				mac := GetControllerMAC(path)
+				if mac != "" {
+					err := DisconnectDualSenseNative(mac)
+					if err != nil {
+						fmt.Println("Fail D-Bus:", err)
 					}
 				}
 			}
 		}
-	}()
+	}
+
 }
 
 func StartControllerManager(myApp fyne.App, conf *config.Config) *container.AppTabs {
@@ -208,7 +211,9 @@ func StartControllerManager(myApp fyne.App, conf *config.Config) *container.AppT
 			}
 
 			if changed {
-				refreshTabs()
+				fyne.Do(func() {
+					refreshTabs()
+				})
 			}
 
 			time.Sleep(2 * time.Second)
