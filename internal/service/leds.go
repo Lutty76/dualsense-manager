@@ -43,10 +43,13 @@ func RunChargingAnimation(ctx context.Context, jsPath string) {
 
 }
 
-func RunRGBChargingAnimation(ctx context.Context, jsPath string, percent float64) {
+func RunRGBChargingAnimation(ctx context.Context, jsPath string, batteryLevel chan float64) {
 	ticker := time.NewTicker(25 * time.Millisecond) // Animation fluide
 	defer ticker.Stop()
 
+	percent := <-batteryLevel
+
+	fmt.Println("Starting RGB charging animation with battery level:", percent)
 	baseR, baseG := 255, 255
 	if percent > 50 {
 		baseR = int(255 * (100 - percent) / 50)
@@ -59,6 +62,14 @@ func RunRGBChargingAnimation(ctx context.Context, jsPath string, percent float64
 		select {
 		case <-ctx.Done():
 			return
+		case percent := <-batteryLevel:
+			fmt.Println("updating RGB charging animation with battery level:", percent)
+			baseR, baseG = 255, 255
+			if percent > 50 {
+				baseR = int(255 * (100 - percent) / 50)
+			} else {
+				baseG = int(255 * percent / 50)
+			}
 		case <-ticker.C:
 			// Utilisation d'un sinus pour une variation fluide (0.2 à 1.0)
 			brightness := 0.6 + 0.4*math.Sin(theta)
