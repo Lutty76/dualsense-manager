@@ -37,9 +37,8 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 			animCancel()
 			return
 		default:
-			level, err := GetActualBatteryLevel(path)
-			status, _ := GetChargingStatus(path)
-			mac := GetControllerMAC(path)
+			level, err := ActualBatteryLevel(path)
+			status, _ := ChargingStatus(path)
 
 			if err != nil {
 				state.StateText.Set("Dualsense not found")
@@ -53,7 +52,6 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 			state.BatteryValue.Set(float64(level) / 100.0)
 			state.BatteryText.Set(fmt.Sprintf("Battery : %d%%", level))
 			state.StateText.Set("State : " + status)
-			state.MacText.Set("MAC : " + mac)
 			ledPref, _ := state.LedPlayerPreference.Get()
 			rgbPref, _ := state.LedRGBPreference.Get()
 
@@ -92,8 +90,8 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 				case ui.RGBModeBattery:
 					SetBatteryColor(path, float64(level))
 				case ui.RGBModeStatic:
-					ctrlConf := config.Load().GetControllerConfig(mac)
-					r, g, b := hexToRGB(ctrlConf.LedRGBStatic)
+					hexColor, _ := state.LedRGBStaticColor.Get()
+					r, g, b := hexToRGB(hexColor)
 					setLightbarRGB(path, r, g, b)
 
 				case ui.RGBModeOff:
@@ -159,7 +157,9 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 
 			if diff > limit {
 				fmt.Println("Auto disconnect !")
-				mac := GetControllerMAC(path)
+				// prefer cached MAC from UI state to avoid repeated sysfs reads
+				macText, _ := state.MacText.Get()
+				mac := strings.TrimSpace(strings.TrimPrefix(macText, "MAC :"))
 				if mac != "" {
 					err := DisconnectDualSenseNative(mac)
 					if err != nil {
@@ -207,9 +207,9 @@ func StartControllerManager(myApp fyne.App, conf *config.Config, debug bool) *co
 					}
 
 					ctx, cancel := context.WithCancel(context.Background())
-					mac := GetControllerMAC(path)
+					mac := ControllerMAC(path)
 					ctrlConf := conf.GetControllerConfig(mac)
-					newTab := ui.CreateNewControllerTab(path, conf, ctrlConf, id+1)
+					newTab := ui.CreateNewControllerTab(path, conf, ctrlConf, mac, id+1)
 					newTab.CancelFunc = cancel
 					activeControllers[path] = newTab
 
@@ -254,7 +254,7 @@ func pathExists(path string) bool {
 }
 
 func getShortMAC(path string) string {
-	fullMAC := GetControllerMAC(path)
+	fullMAC := ControllerMAC(path)
 	if len(fullMAC) > 5 {
 		return fullMAC[len(fullMAC)-5:]
 	}

@@ -30,7 +30,7 @@ func MonitorJoystick(path string, activityChan chan time.Time, state *ui.AppStat
 			_, err := f.Read(buffer)
 			if err != nil {
 				if debug {
-					fmt.Println("Joypad disconnected, stopping ...")
+					fmt.Println("Stopping joystick monitor for controller at path:", path)
 				}
 				f.Close()
 				break
@@ -45,9 +45,19 @@ func MonitorJoystick(path string, activityChan chan time.Time, state *ui.AppStat
 			switch evType {
 			case 1: // Bouton pressé
 				isReal = true
+				if debug {
+					fmt.Printf("Button %d event detected with value: %d\n", buffer[7], evValue)
+				}
 			case 2: // Axe bougé
 				if evValue > deadzone || evValue < -deadzone {
 					isReal = true
+					if debug {
+						fmt.Printf("Axis %d event detected with value: %d\n", buffer[7], evValue)
+					}
+				} else {
+					if debug {
+						fmt.Printf("Axis %d event ignored due to deadzone with value: %d\n", buffer[7], evValue)
+					}
 				}
 			}
 

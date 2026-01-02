@@ -10,8 +10,8 @@ import (
 
 const powerPath = "/sys/class/power_supply/ps-controller-battery-*/"
 
-func GetActualBatteryLevel(jsPath string) (int, error) {
-	basePath := getBatteryPath(jsPath)
+func ActualBatteryLevel(jsPath string) (int, error) {
+	basePath := batteryPath(jsPath)
 	if basePath == "" {
 		return 0, fmt.Errorf("Disconnected")
 	}
@@ -29,8 +29,8 @@ func GetActualBatteryLevel(jsPath string) (int, error) {
 	return level, nil
 }
 
-func GetChargingStatus(jsPath string) (string, error) {
-	basePath := getBatteryPath(jsPath)
+func ChargingStatus(jsPath string) (string, error) {
+	basePath := batteryPath(jsPath)
 	if basePath == "" {
 		return "", fmt.Errorf("Disconnected")
 	}
@@ -43,7 +43,7 @@ func GetChargingStatus(jsPath string) (string, error) {
 	return strings.TrimSpace(string(data)), nil
 }
 
-func getBatteryPath(jsPath string) string {
+func batteryPath(jsPath string) string {
 
 	devicePath := fmt.Sprintf("/sys/class/input/%s/device/device/power_supply", filepath.Base(jsPath))
 
