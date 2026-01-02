@@ -17,15 +17,18 @@ import (
 )
 
 func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState, path string, id int, debug bool) {
-	var animCancel context.CancelFunc = func() {}
-	var animActive bool
+	var animCancelPlayer context.CancelFunc = func() {}
+	var animCancelRGB context.CancelFunc = func() {}
+	var animActivePlayer bool
+	var animActiveRGB bool
 
 	if debug {
 		fmt.Println("Starting battery loop for controller at path:", path)
 	}
 
 	defer func() {
-		animCancel()
+		animCancelPlayer()
+		animCancelRGB()
 		if debug {
 			fmt.Println("Stopping battery loop for controller at path:", path)
 		}
@@ -34,7 +37,8 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 	for {
 		select {
 		case <-ctx.Done():
-			animCancel()
+			animCancelPlayer()
+			animCancelRGB()
 			return
 		default:
 			level, err := ActualBatteryLevel(path)
@@ -54,38 +58,44 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 			state.StateText.Set("State : " + status)
 			ledPref, _ := state.LedPlayerPreference.Get()
 			rgbPref, _ := state.LedRGBPreference.Get()
-
-			shouldAnimate := status == "Charging" &&
-				(ledPref == ui.PlayerModeBattery || rgbPref == ui.RGBModeBattery)
-
-			if shouldAnimate {
-				if !animActive {
-					var animCtx context.Context
-					animCtx, animCancel = context.WithCancel(ctx)
-					animActive = true
-
-					if ledPref == ui.PlayerModeBattery {
-						go RunChargingAnimation(animCtx, path)
-					}
-					if rgbPref == ui.RGBModeBattery {
-						go RunRGBChargingAnimation(animCtx, path, float64(level))
-					}
+			if (ledPref == ui.PlayerModeBattery) && status == "Charging" {
+				if !animActivePlayer {
+					var animCtxPlayer context.Context
+					animCtxPlayer, animCancelPlayer = context.WithCancel(ctx)
+					animActivePlayer = true
+					go RunChargingAnimation(animCtxPlayer, path)
 				}
+
 			} else {
-				if animActive {
-					animCancel()
-					animCancel = func() {}
-					animActive = false
+				if animActivePlayer {
+					animCancelPlayer()
+					animCancelPlayer = func() {}
+					animActivePlayer = false
 				}
 
-				// --- Gestion LEDS PLAYER ---
 				if ledPref == ui.PlayerModeBattery {
 					SetBatteryLeds(path, float64(level))
 				} else {
-					SetPlayerNumber(path, id)
+					SetPlayerNumber(path, id) // Mode Numéro de manette
 				}
 
-				// --- Gestion RGB ---
+			}
+
+			if status == "Charging" && (rgbPref == ui.RGBModeBattery) {
+				if !animActiveRGB {
+					var animCtxRGB context.Context
+					animCtxRGB, animCancelRGB = context.WithCancel(ctx)
+					animActiveRGB = true
+					go RunRGBChargingAnimation(animCtxRGB, path, float64(level))
+				}
+			} else {
+				// 2. Pas d'animation : on arrête tout et on applique le fixe
+				if animActiveRGB {
+					animCancelRGB()
+					animCancelRGB = func() {}
+					animActiveRGB = false
+				}
+
 				switch rgbPref {
 				case ui.RGBModeBattery:
 					SetBatteryColor(path, float64(level))
