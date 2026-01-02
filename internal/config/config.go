@@ -81,7 +81,10 @@ func Load() *Config {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		_ = Save(conf)
+		err = Save(conf)
+		if err != nil {
+			return conf
+		}
 		return conf
 	}
 
