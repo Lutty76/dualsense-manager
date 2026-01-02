@@ -1,7 +1,7 @@
 DualSense Manager
 =================
 
-A small desktop utility to monitor and manage DualSense controllers on Linux. It displays battery level, charging state, controller MAC, and controls LEDs/RGB behaviors. Built with Go and the Fyne GUI toolkit.
+A small desktop utility to monitor and manage DualSense controllers on Linux. It displays battery level, charging state, controller MAC, controls LEDs/RGB behaviors and auto turn off when idle. Built with Go and the Fyne GUI toolkit.
 
 ### Features
 - Monitor battery level & charging state
@@ -11,7 +11,6 @@ A small desktop utility to monitor and manage DualSense controllers on Linux. It
 - Verbose logging option
 
 ### Prerequisites
-- Go (1.18+ recommended)
 - libudev and access to `/sys/class/leds` (udev rules below)
 - A Linux desktop environment (system tray support required for tray features)
 
@@ -26,11 +25,11 @@ go run .
 ### Running
 - Start normally: `./dualsense-mgr`
 - Start hidden in system tray: `./dualsense-mgr -hide` or `-h`
-- Verbose logging: `./dualsense-mgr -verbose` or `-v`
-- Show version: `./dualsense-mgr -version` or `-V`
+- Debug logging: `./dualsense-mgr -debug` or `-d`
+- Show version: `./dualsense-mgr -version` or `-v`
 
 #### Precompiled binary
-A precompiled binary will be provided in the `dualsense-mgr` repository for convenience. You can download that binary and run it directly (ensure it is executable with `chmod +x`).
+A precompiled binary will be provided in the repository release for convenience. You can download that binary and run it directly (ensure it is executable with `chmod +x`).
 
 udev rules (required)
 Create a udev rules file to set permissions for DualSense LED controls. Example file:
