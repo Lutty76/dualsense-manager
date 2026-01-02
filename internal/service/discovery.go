@@ -7,13 +7,19 @@ import (
 	"strings"
 )
 
-func FindAllDualSense() []string {
+func FindAllDualSense() ([]string, error) {
 	var found []string
-	matches, _ := filepath.Glob("/dev/input/js*")
-
+	matches, err := filepath.Glob("/dev/input/js*")
+	if err != nil {
+		return found, err
+	}
 	for _, path := range matches {
 		namePath := fmt.Sprintf("/sys/class/input/%s/device/name", filepath.Base(path))
-		nameBytes, _ := os.ReadFile(namePath)
+		nameBytes, err := os.ReadFile(namePath)
+		if err != nil {
+			fmt.Printf("Unable to read %s", namePath)
+			continue
+		}
 		name := strings.ToLower(string(nameBytes))
 
 		if strings.Contains(name, "sony") || strings.Contains(name, "dualsense") {
@@ -23,5 +29,5 @@ func FindAllDualSense() []string {
 			found = append(found, path)
 		}
 	}
-	return found
+	return found, nil
 }

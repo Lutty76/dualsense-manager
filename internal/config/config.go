@@ -53,15 +53,21 @@ func (c *Config) ControllerConfig(mac string) *ControllerConfig {
 	return res
 }
 
-func configPath() string {
-	home, _ := os.UserHomeDir()
+func configPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
 	path := filepath.Join(home, ".config", "dualsense-manager")
 	_ = os.MkdirAll(path, 0755)
-	return filepath.Join(path, "config.yaml")
+	return filepath.Join(path, "config.yaml"), nil
 }
 
 func Save(conf *Config) error {
-	path := configPath()
+	path, err := configPath()
+	if err != nil {
+		return err
+	}
 
 	data, err := yaml.Marshal(conf)
 	if err != nil {
@@ -71,8 +77,11 @@ func Save(conf *Config) error {
 	return os.WriteFile(path, data, 0644)
 }
 
-func Load() *Config {
-	path := configPath()
+func Load() (*Config, error) {
+	path, err := configPath()
+	if err != nil {
+		return nil, err
+	}
 
 	conf := &Config{
 		IdleMinutes:  10,
@@ -83,15 +92,15 @@ func Load() *Config {
 	if err != nil {
 		err = Save(conf)
 		if err != nil {
-			return conf
+			return nil, err
 		}
-		return conf
+		return conf, nil
 	}
 
 	err = yaml.Unmarshal(data, conf)
 	if err != nil {
-		return conf
+		return nil, nil
 	}
 
-	return conf
+	return conf, nil
 }
