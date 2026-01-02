@@ -21,9 +21,9 @@ type ControllerConfig struct {
 	LedRGBStatic        string `yaml:"led_rgb_static,omitempty"`
 }
 
-// GetControllerConfig returns the configuration for a specific controller MAC.
+// ControllerConfig returns the configuration for a specific controller MAC.
 // If a per-MAC config is not present or fields are zero, fall back to top-level defaults.
-func (c *Config) GetControllerConfig(mac string) *ControllerConfig {
+func (c *Config) ControllerConfig(mac string) *ControllerConfig {
 	// Start with reasonable defaults
 	res := &ControllerConfig{
 		Deadzone:            1500,
@@ -53,7 +53,7 @@ func (c *Config) GetControllerConfig(mac string) *ControllerConfig {
 	return res
 }
 
-func getConfigPath() string {
+func configPath() string {
 	home, _ := os.UserHomeDir()
 	path := filepath.Join(home, ".config", "dualsense-manager")
 	_ = os.MkdirAll(path, 0755)
@@ -61,7 +61,7 @@ func getConfigPath() string {
 }
 
 func Save(conf *Config) error {
-	path := getConfigPath()
+	path := configPath()
 
 	data, err := yaml.Marshal(conf)
 	if err != nil {
@@ -72,7 +72,7 @@ func Save(conf *Config) error {
 }
 
 func Load() *Config {
-	path := getConfigPath()
+	path := configPath()
 
 	conf := &Config{
 		IdleMinutes:  10,

@@ -18,6 +18,7 @@ type ControllerTab struct {
 	ActivityChan chan time.Time
 	Container    *fyne.Container
 	CancelFunc   context.CancelFunc
+	MacAddress   string
 }
 
 func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.ControllerConfig, macAddress string, id int) *ControllerTab {
@@ -52,12 +53,13 @@ func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.C
 
 	activityChan := make(chan time.Time)
 
-	uiContent := CreateContent(conf, state)
+	uiContent := CreateContent(conf, ctrlConf, state)
 
 	return &ControllerTab{
 		Path:         path,
 		State:        state,
 		ActivityChan: activityChan,
 		Container:    container.NewPadded(uiContent),
+		MacAddress:   macAddress,
 	}
 }

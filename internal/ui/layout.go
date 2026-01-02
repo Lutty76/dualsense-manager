@@ -51,24 +51,12 @@ var rgbOptions = map[int]string{
 	RGBModeOff:     "Disable",
 }
 
-func CreateContent(conf *config.Config, state *AppState) fyne.CanvasObject {
+func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state *AppState) fyne.CanvasObject {
 	options := []string{"1 min", "2 min", "5 min", "10 min", "20 min", "30 min", "40 min", "Never"}
 	optionsBattery := []string{"5 %", "15 %", "25 %", "Never"}
 
-	// helper to extract MAC address from state.MacText binding (value like "MAC : xx:xx:...")
-	getMac := func() string {
-		s, _ := state.MacText.Get()
-		s = strings.TrimPrefix(s, "MAC :")
-		s = strings.TrimSpace(s)
-		return s
-	}
-
-	// load controller-specific config only when MAC is available
-	mac := getMac()
-	var ctrlConf *config.ControllerConfig
-	if mac != "" {
-		ctrlConf = conf.GetControllerConfig(mac)
-	}
+	macText, _ := state.MacText.Get()
+	mac := strings.TrimSpace(strings.TrimPrefix(macText, "MAC :"))
 
 	// helper to update per-controller config and persist changes
 	saveCtrl := func(mac string, update func(*config.ControllerConfig)) {
@@ -84,7 +72,7 @@ func CreateContent(conf *config.Config, state *AppState) fyne.CanvasObject {
 		config.Save(conf)
 	}
 
-	selectWidget := widget.NewSelect(options, func(value string) {
+	selectDelayWidget := widget.NewSelect(options, func(value string) {
 		state.SelectedDuration.Set(value)
 		if value == "Never" {
 			conf.IdleMinutes = 0
@@ -97,9 +85,9 @@ func CreateContent(conf *config.Config, state *AppState) fyne.CanvasObject {
 
 	// initialize selection from global config
 	if conf.IdleMinutes == 0 {
-		selectWidget.SetSelected("Never")
+		selectDelayWidget.SetSelected("Never")
 	} else {
-		selectWidget.SetSelected(fmt.Sprintf("%d min", conf.IdleMinutes))
+		selectDelayWidget.SetSelected(fmt.Sprintf("%d min", conf.IdleMinutes))
 	}
 
 	selectBatteryWidget := widget.NewSelect(optionsBattery, func(value string) {
@@ -136,7 +124,7 @@ func CreateContent(conf *config.Config, state *AppState) fyne.CanvasObject {
 		val := int(v)
 		deadzoneLabel.SetText(fmt.Sprintf("Deadzone : %d", val))
 		// save per-controller if mac known
-		if mac := getMac(); mac != "" {
+		if mac != "" {
 			state.DeadzoneValue.Set(v)
 			saveCtrl(mac, func(cc *config.ControllerConfig) { cc.Deadzone = val })
 		}
@@ -148,7 +136,7 @@ func CreateContent(conf *config.Config, state *AppState) fyne.CanvasObject {
 		for id, name := range playerOptions {
 			if name == selected {
 				state.LedPlayerPreference.Set(id)
-				if mac := getMac(); mac != "" {
+				if mac != "" {
 					saveCtrl(mac, func(cc *config.ControllerConfig) { cc.LedPlayerPreference = id })
 				}
 				break
@@ -177,15 +165,13 @@ func CreateContent(conf *config.Config, state *AppState) fyne.CanvasObject {
 	currentIDRGB, _ := state.LedRGBPreference.Get()
 	rgbSelect.SetSelected(rgbOptions[currentIDRGB])
 
-	// bind the entry directly to the state value so it's always in-sync
 	staticColorEntry := widget.NewEntryWithData(state.LedRGBStaticColor)
 	staticColorEntry.SetPlaceHolder("FFFFFF")
-	// small validation hint shown when hex is invalid (red text)
+
 	validationLabel := canvas.NewText("Invalid hex (RRGGBB)", color.RGBA{R: 0xFF, G: 0x00, B: 0x00, A: 0xFF})
 	validationLabel.TextSize = 12
 	validationLabel.Hide()
 
-	// validation regex and debounce timer for saving to disk
 	hexRegex := regexp.MustCompile(`(?i)^[0-9A-F]{6}$`)
 	var hexSaveTimer *time.Timer
 	const saveDebounce = 800 * time.Millisecond
@@ -215,14 +201,13 @@ func CreateContent(conf *config.Config, state *AppState) fyne.CanvasObject {
 		if hexSaveTimer != nil {
 			hexSaveTimer.Stop()
 		}
-		macNow := getMac()
 		// capture current normalized value for the save closure
 		val := norm
 		hexSaveTimer = time.AfterFunc(saveDebounce, func() {
-			if macNow == "" {
+			if mac == "" {
 				return
 			}
-			saveCtrl(macNow, func(cc *config.ControllerConfig) { cc.LedRGBStatic = "#" + val })
+			saveCtrl(mac, func(cc *config.ControllerConfig) { cc.LedRGBStatic = "#" + val })
 		})
 	}
 	staticColorContainer := container.NewBorder(nil, nil, widget.NewLabel("Static Color Hex (RRGGBB): "), nil, container.NewVBox(staticColorEntry, validationLabel))
@@ -238,7 +223,7 @@ func CreateContent(conf *config.Config, state *AppState) fyne.CanvasObject {
 		for id, name := range rgbOptions {
 			if name == selected {
 				state.LedRGBPreference.Set(id)
-				if mac := getMac(); mac != "" {
+				if mac != "" {
 					saveCtrl(mac, func(cc *config.ControllerConfig) { cc.LedRGBPreference = id })
 				}
 				if id == RGBModeStatic {
@@ -267,7 +252,7 @@ func CreateContent(conf *config.Config, state *AppState) fyne.CanvasObject {
 		widget.NewSeparator(),
 		widget.NewSeparator(),
 		container.NewBorder(nil, nil, widget.NewLabel("Battery alert :"), nil, selectBatteryWidget),
-		container.NewBorder(nil, nil, widget.NewLabel("Delay :"), nil, selectWidget),
+		container.NewBorder(nil, nil, widget.NewLabel("Delay :"), nil, selectDelayWidget),
 		widget.NewLabelWithData(state.LastActivityBinding),
 	)
 }

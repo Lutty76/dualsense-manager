@@ -104,4 +104,4 @@ Notes
 Feel free to open issues or submit pull requests. Follow Go formatting conventions (`gofmt`) and keep changes minimal and focused.
 
 ### License
-Specify your license here.
+GPL-3.0 License

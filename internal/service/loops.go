@@ -6,7 +6,6 @@ import (
 	"dualsense/internal/ui"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -194,8 +193,8 @@ func StartControllerManager(myApp fyne.App, conf *config.Config, debug bool) *co
 		if len(activeControllers) == 0 {
 			items = append(items, emptyTab)
 		} else {
-			for path, ctrl := range activeControllers {
-				tabName := fmt.Sprintf("DualSense %s", getShortMAC(path))
+			for _, ctrl := range activeControllers {
+				tabName := fmt.Sprintf("DualSense %s", ShortMAC(ctrl.MacAddress))
 				items = append(items, container.NewTabItem(tabName, ctrl.Container))
 			}
 		}
@@ -218,7 +217,7 @@ func StartControllerManager(myApp fyne.App, conf *config.Config, debug bool) *co
 
 					ctx, cancel := context.WithCancel(context.Background())
 					mac := ControllerMAC(path)
-					ctrlConf := conf.GetControllerConfig(mac)
+					ctrlConf := conf.ControllerConfig(mac)
 					newTab := ui.CreateNewControllerTab(path, conf, ctrlConf, mac, id+1)
 					newTab.CancelFunc = cancel
 					activeControllers[path] = newTab
@@ -263,12 +262,11 @@ func pathExists(path string) bool {
 	return false
 }
 
-func getShortMAC(path string) string {
-	fullMAC := ControllerMAC(path)
+func ShortMAC(fullMAC string) string {
 	if len(fullMAC) > 5 {
 		return fullMAC[len(fullMAC)-5:]
 	}
-	return filepath.Base(path)
+	return fullMAC
 }
 
 func hexToRGB(hexStr string) (int, int, int) {
