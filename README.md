@@ -104,3 +104,11 @@ Feel free to open issues or submit pull requests. Follow Go formatting conventio
 
 ### License
 GPL-3.0 License
+### FAQ
+
+#### Will this be ported to Windows?
+No, there are already excellent tools available for Windows, such as DS4Windows or built-in Steam support.
+#### Will this be ported to macOS?
+Currently, no. I don’t own a Mac, so I’m unable to develop or test on macOS. However, contributions are welcome if you'd like to help port it.
+#### My controller turns off before the delay time — why?
+Steam has built-in controller management that includes auto-disconnect features. If Steam is running, it may power off your controller before this app’s timer triggers. To fix this, disable auto-disconnect in Steam’s controller settings. Alternatively, if you always use Steam, you may not need this app — Steam already handles most of these functions.
