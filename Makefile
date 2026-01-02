@@ -1,7 +1,7 @@
 BINARY_NAME=dualsense-mgr
 
 build:
-	go build -ldflags="-s -w" -o $(BINARY_NAME) main.go bundled.go
+	go build -ldflags="-s -w" -o $(BINARY_NAME) .
 
 compress:
 	upx --best --lzma $(BINARY_NAME)
