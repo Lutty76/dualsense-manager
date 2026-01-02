@@ -96,7 +96,7 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 					var animCtxRGB context.Context
 					animCtxRGB, animCancelRGB = context.WithCancel(ctx)
 					animActiveRGB = true
-					go RunRGBChargingAnimation(animCtxRGB, path, batteryChan)
+					go RunRGBChargingAnimation(animCtxRGB, path, batteryChan, debug)
 					if level != previousLevel {
 						select {
 						case batteryChan <- float64(level):
