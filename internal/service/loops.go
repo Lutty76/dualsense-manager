@@ -20,6 +20,8 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 	var animCancelRGB context.CancelFunc = func() {}
 	var animActivePlayer bool
 	var animActiveRGB bool
+	batteryChan := make(chan float64)
+	previousLevel := -1
 
 	if debug {
 		fmt.Println("Starting battery loop for controller at path:", path)
@@ -56,6 +58,13 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 			state.BatteryValue.Set(float64(level) / 100.0)
 			state.BatteryText.Set(fmt.Sprintf("Battery : %d%%", level))
 			state.StateText.Set("State : " + status)
+			if level != previousLevel {
+				select {
+				case batteryChan <- float64(level):
+					previousLevel = level
+				default:
+				}
+			}
 			ledPref, _ := state.LedPlayerPreference.Get()
 			rgbPref, _ := state.LedRGBPreference.Get()
 			// 1. Gestion des animations
@@ -87,7 +96,8 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 					var animCtxRGB context.Context
 					animCtxRGB, animCancelRGB = context.WithCancel(ctx)
 					animActiveRGB = true
-					go RunRGBChargingAnimation(animCtxRGB, path, float64(level))
+					go RunRGBChargingAnimation(animCtxRGB, path, batteryChan)
+					batteryChan <- float64(level)
 				}
 			} else {
 				// 2. Pas d'animation : on arrête tout et on applique le fixe
