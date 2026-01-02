@@ -35,7 +35,10 @@ func MonitorJoystick(path string, activityChan chan time.Time, state *ui.AppStat
 				f.Close()
 				break
 			}
-			val, _ := state.DeadzoneValue.Get()
+			val, err := state.DeadzoneValue.Get()
+			if err != nil {
+				val = 1500
+			}
 			deadzone := int16(val)
 
 			evType := buffer[6]

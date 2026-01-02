@@ -29,7 +29,11 @@ func main() {
 		return
 	}
 
-	conf := config.Load()
+	conf, err := config.Load()
+	if err != nil {
+		fmt.Println("Error loading configuration:", err)
+		return
+	}
 	myApp := app.NewWithID("com.dualsense.manager")
 	myWindow := myApp.NewWindow("DualSense Manager")
 

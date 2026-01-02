@@ -55,7 +55,10 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 	options := []string{"1 min", "2 min", "5 min", "10 min", "20 min", "30 min", "40 min", "Never"}
 	optionsBattery := []string{"5 %", "15 %", "25 %", "Never"}
 
-	macText, _ := state.MacText.Get()
+	macText, err := state.MacText.Get()
+	if err != nil {
+		macText = ""
+	}
 	mac := strings.TrimSpace(strings.TrimPrefix(macText, "MAC :"))
 
 	// helper to update per-controller config and persist changes
@@ -80,7 +83,11 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 		if value == "Never" {
 			conf.IdleMinutes = 0
 		} else {
-			min, _ := strconv.Atoi(strings.Split(value, " ")[0])
+			min, err := strconv.Atoi(strings.Split(value, " ")[0])
+			if err != nil {
+				fmt.Printf("Unable to parse delay : %s", value)
+				return
+			}
 			conf.IdleMinutes = min
 		}
 
@@ -101,7 +108,11 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 		if value == "Never" {
 			conf.BatteryAlert = 0
 		} else {
-			percent, _ := strconv.Atoi(strings.Split(value, " ")[0])
+			percent, err := strconv.Atoi(strings.Split(value, " ")[0])
+			if err != nil {
+				fmt.Printf("Unable to parse battery alert : %s", value)
+				return
+			}
 			conf.BatteryAlert = percent
 		}
 
@@ -171,9 +182,15 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 			}
 		}
 	}
-	currentID, _ := state.LedPlayerPreference.Get()
+	currentID, err := state.LedPlayerPreference.Get()
+	if err != nil {
+		currentID = PlayerModeNumber
+	}
 	ledSelect.SetSelected(playerOptions[currentID])
-	currentIDRGB, _ := state.LedRGBPreference.Get()
+	currentIDRGB, err := state.LedRGBPreference.Get()
+	if err != nil {
+		currentIDRGB = RGBModeBattery
+	}
 	rgbSelect.SetSelected(rgbOptions[currentIDRGB])
 
 	staticColorEntry := widget.NewEntryWithData(state.LedRGBStaticColor)
@@ -247,7 +264,11 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 		}
 	}
 
-	controllerId, _ := state.ControllerId.Get()
+	controllerId, err := state.ControllerId.Get()
+	if err != nil {
+		fmt.Println("Error getting controller ID:", err)
+		controllerId = 0
+	}
 
 	return container.NewVBox(
 		widget.NewLabel("Controller n°"+strconv.Itoa(controllerId)),

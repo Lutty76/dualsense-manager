@@ -43,13 +43,15 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 			return
 		default:
 			level, err := ActualBatteryLevel(path)
-			status, _ := ChargingStatus(path)
-
 			if err != nil {
 				state.StateText.Set("Dualsense not found")
 				state.BatteryText.Set("Battery : --%")
 				state.BatteryValue.Set(0)
 				time.Sleep(5 * time.Second)
+				continue
+			}
+			status, err := ChargingStatus(path)
+			if err != nil {
 				continue
 			}
 
@@ -64,8 +66,15 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 				default:
 				}
 			}
-			ledPref, _ := state.LedPlayerPreference.Get()
-			rgbPref, _ := state.LedRGBPreference.Get()
+			ledPref, err := state.LedPlayerPreference.Get()
+			if err != nil {
+				ledPref = ui.PlayerModeNumber
+			}
+			rgbPref, err := state.LedRGBPreference.Get()
+			if err != nil {
+				rgbPref = ui.RGBModeBattery
+			}
+
 			if (ledPref == ui.PlayerModeBattery) && status == "Charging" {
 				if !animActivePlayer {
 					var animCtxPlayer context.Context
@@ -104,7 +113,6 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 					}
 				}
 			} else {
-				// 2. Pas d'animation : on arrête tout et on applique le fixe
 				if animActiveRGB {
 					animCancelRGB()
 					animCancelRGB = func() {}
@@ -115,7 +123,10 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 				case ui.RGBModeBattery:
 					SetBatteryColor(path, float64(level))
 				case ui.RGBModeStatic:
-					hexColor, _ := state.LedRGBStaticColor.Get()
+					hexColor, err := state.LedRGBStaticColor.Get()
+					if err != nil {
+						hexColor = "0000FF"
+					}
 					r, g, b := hexToRGB(hexColor)
 					setLightbarRGB(path, r, g, b)
 
@@ -147,7 +158,10 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 			lastActivityTime = t
 			state.LastActivityBinding.Set("In use")
 		case <-ticker.C:
-			status, _ := state.StateText.Get()
+			status, err := state.StateText.Get()
+			if err != nil {
+				continue
+			}
 
 			if strings.Contains(status, "not found") || strings.Contains(status, "Recherche") {
 				lastActivityTime = time.Now()
@@ -156,7 +170,10 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 			}
 			diff := time.Since(lastActivityTime)
 
-			currentChoice, _ := state.SelectedDuration.Get()
+			currentChoice, err := state.SelectedDuration.Get()
+			if err != nil {
+				continue
+			}
 
 			if currentChoice == "" {
 				continue
@@ -183,7 +200,10 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 			if diff > limit {
 				fmt.Println("Auto disconnect !")
 				// prefer cached MAC from UI state to avoid repeated sysfs reads
-				macText, _ := state.MacText.Get()
+				macText, err := state.MacText.Get()
+				if err != nil {
+					continue
+				}
 				mac := strings.TrimSpace(strings.TrimPrefix(macText, "MAC :"))
 				if mac != "" {
 					err := DisconnectDualSenseNative(mac)
@@ -221,7 +241,11 @@ func StartControllerManager(myApp fyne.App, conf *config.Config, debug bool) *co
 
 	go func() {
 		for {
-			foundPaths := FindAllDualSense()
+			foundPaths, err := FindAllDualSense()
+			if err != nil {
+				fmt.Println("Error finding DualSense controllers:", err)
+				return
+			}
 			changed := false
 
 			for id, path := range foundPaths {
@@ -290,8 +314,17 @@ func hexToRGB(hexStr string) (int, int, int) {
 	if len(hexStr) != 6 {
 		return 0, 0, 0
 	}
-	r, _ := strconv.ParseInt(hexStr[0:2], 16, 0)
-	g, _ := strconv.ParseInt(hexStr[2:4], 16, 0)
-	b, _ := strconv.ParseInt(hexStr[4:6], 16, 0)
+	r, err := strconv.ParseInt(hexStr[0:2], 16, 0)
+	if err != nil {
+		return 0, 0, 0
+	}
+	g, err := strconv.ParseInt(hexStr[2:4], 16, 0)
+	if err != nil {
+		return 0, 0, 0
+	}
+	b, err := strconv.ParseInt(hexStr[4:6], 16, 0)
+	if err != nil {
+		return 0, 0, 0
+	}
 	return int(r), int(g), int(b)
 }
