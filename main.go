@@ -4,6 +4,7 @@ import (
 	"dualsense/internal/config"
 	"dualsense/internal/service"
 	"flag"
+	"fmt"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -14,23 +15,24 @@ func main() {
 
 	hidePtr := flag.Bool("hide", false, "Start the application hidden in the system tray")
 	flag.BoolVar(hidePtr, "h", false, "Start the application hidden in the system tray (shorthand)")
-	debugPtr := flag.Bool("verbose", false, "Enable verbose logging")
-	flag.BoolVar(debugPtr, "v", false, "Enable verbose logging (shorthand)")
+	debugPtr := flag.Bool("debug", false, "Enable debug logging")
+	flag.BoolVar(debugPtr, "d", false, "Enable debug logging (shorthand)")
 	versionPtr := flag.Bool("version", false, "Show version information")
-	flag.BoolVar(versionPtr, "V", false, "Show version information (shorthand)")
-
-	if *versionPtr {
-		println("DualSense Manager version 0.1") // Replace with actual version retrieval if needed
-		return
-	}
+	flag.BoolVar(versionPtr, "v", false, "Show version information (shorthand)")
 
 	flag.Parse()
+
+	if *versionPtr {
+		fmt.Println("DualSense Manager version 0.1")
+		return
+	}
 
 	conf := config.Load()
 	myApp := app.NewWithID("com.dualsense.manager")
 	myWindow := myApp.NewWindow("DualSense Manager")
 
 	myApp.SetIcon(resourceIconPng)
+	myWindow.SetIcon(resourceIconPng)
 
 	if desk, ok := myApp.(desktop.App); ok {
 		menu := fyne.NewMenu("DualSense",

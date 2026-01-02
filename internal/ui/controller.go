@@ -20,7 +20,7 @@ type ControllerTab struct {
 	CancelFunc   context.CancelFunc
 }
 
-func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.ControllerConfig, id int) *ControllerTab {
+func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.ControllerConfig, macAddress string, id int) *ControllerTab {
 	state := &AppState{
 		ControllerId:        binding.NewInt(),
 		BatteryValue:        binding.NewFloat(),
@@ -39,6 +39,7 @@ func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.C
 	state.DeadzoneValue.Set(float64(ctrlConf.Deadzone))
 	state.LedRGBPreference.Set(ctrlConf.LedRGBPreference)
 	state.LedPlayerPreference.Set(ctrlConf.LedPlayerPreference)
+	state.MacText.Set("MAC : " + macAddress)
 	// initialize static RGB color binding without leading '#'
 	if ctrlConf.LedRGBStatic != "" {
 		state.LedRGBStaticColor.Set(strings.TrimPrefix(ctrlConf.LedRGBStatic, "#"))

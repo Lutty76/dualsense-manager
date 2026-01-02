@@ -9,7 +9,7 @@ import (
 	"github.com/godbus/dbus/v5"
 )
 
-func GetControllerMAC(path string) string {
+func ControllerMAC(path string) string {
 	devName := filepath.Base(path)
 
 	macPath := fmt.Sprintf("/sys/class/input/%s/device/uniq", devName)
