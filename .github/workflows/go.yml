@@ -1,0 +1,34 @@
+name: Build DualSense Manager
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21' # Version recommandée pour Fyne et l'embed
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgl1-mesa-dev xorg-dev upx
+
+    - name: Build and Compress
+      run: |
+        make build
+        make compress
+
+    - name: Upload Binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: dualsense-mgr-linux
+        path: dualsense-mgr
