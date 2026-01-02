@@ -16,14 +16,20 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func StartBatteryLoop(ctx context.Context, app fyne.App, state *ui.AppState, path string) {
+func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState, path string, id int, debug bool) {
 	var animCancel context.CancelFunc = func() {} // no-op cancel to satisfy linters
 	var animActive bool                           // true when a real cancel is set
+
+	if debug {
+		fmt.Println("Starting battery loop for controller at path:", path)
+	}
 
 	// Au cas où la goroutine principale s'arrête, on nettoie l'animation
 	defer func() {
 		animCancel()
-		fmt.Println("Stopping battery loop for controller at path:", path)
+		if debug {
+			fmt.Println("Stopping battery loop for controller at path:", path)
+		}
 	}()
 
 	for {
@@ -82,7 +88,7 @@ func StartBatteryLoop(ctx context.Context, app fyne.App, state *ui.AppState, pat
 				if ledPref == ui.PlayerModeBattery {
 					SetBatteryLeds(path, float64(level))
 				} else {
-					SetPlayerNumber(path) // Mode Numéro de manette
+					SetPlayerNumber(path, id) // Mode Numéro de manette
 				}
 
 				// --- Gestion RGB ---
@@ -103,14 +109,20 @@ func StartBatteryLoop(ctx context.Context, app fyne.App, state *ui.AppState, pat
 		}
 	}
 }
-func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan chan time.Time, path string) {
+func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan chan time.Time, path string, debug bool) {
+
+	if debug {
+		fmt.Println("Starting activity loop for controller at path:", path)
+	}
 
 	lastActivityTime := time.Now()
 	ticker := time.NewTicker(1 * time.Second)
 	for {
 		select {
 		case <-ctx.Done(): // Si on annule le contexte, on arrête TOUT
-			fmt.Println("Stopping activity loop for controller at path:", path)
+			if debug {
+				fmt.Println("Stopping activity loop for controller at path:", path)
+			}
 			return
 		case t := <-activityChan:
 			lastActivityTime = t
@@ -164,7 +176,10 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 
 }
 
-func StartControllerManager(myApp fyne.App, conf *config.Config) *container.AppTabs {
+func StartControllerManager(myApp fyne.App, conf *config.Config, debug bool) *container.AppTabs {
+	if debug {
+		fmt.Println("StartControllerManager: debug mode enabled")
+	}
 	emptyTab := container.NewTabItem("Info", widget.NewLabel("Waiting for DualSense..."))
 	tabs := container.NewAppTabs(emptyTab)
 	activeControllers := make(map[string]*ui.ControllerTab)
@@ -189,18 +204,23 @@ func StartControllerManager(myApp fyne.App, conf *config.Config) *container.AppT
 			foundPaths := FindAllDualSense()
 			changed := false
 
-			for _, path := range foundPaths {
+			for id, path := range foundPaths {
 				if _, exists := activeControllers[path]; !exists {
+
+					if debug {
+						fmt.Println("New DualSense detected at path:", path)
+					}
+
 					ctx, cancel := context.WithCancel(context.Background())
 					mac := GetControllerMAC(path)
 					ctrlConf := conf.GetControllerConfig(mac)
-					newTab := ui.CreateNewControllerTab(path, conf, ctrlConf)
+					newTab := ui.CreateNewControllerTab(path, conf, ctrlConf, id+1)
 					newTab.CancelFunc = cancel
 					activeControllers[path] = newTab
 
-					go MonitorJoystick(path, newTab.ActivityChan, newTab.State)
-					go StartBatteryLoop(ctx, myApp, newTab.State, path)
-					go StartActivityLoop(ctx, newTab.State, newTab.ActivityChan, path)
+					go MonitorJoystick(path, newTab.ActivityChan, newTab.State, debug)
+					go ManageBatteryAndLEDs(ctx, myApp, newTab.State, path, id+1, debug)
+					go StartActivityLoop(ctx, newTab.State, newTab.ActivityChan, path, debug)
 
 					changed = true
 				}

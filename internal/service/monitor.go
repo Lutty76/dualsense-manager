@@ -8,7 +8,11 @@ import (
 	"time"
 )
 
-func MonitorJoystick(path string, activityChan chan time.Time, state *ui.AppState) {
+func MonitorJoystick(path string, activityChan chan time.Time, state *ui.AppState, debug bool) {
+	if debug {
+		fmt.Println("Starting joystick monitor for controller at path:", path)
+	}
+
 	for {
 		f, err := os.Open(path)
 		if err != nil {
@@ -25,7 +29,9 @@ func MonitorJoystick(path string, activityChan chan time.Time, state *ui.AppStat
 		for {
 			_, err := f.Read(buffer)
 			if err != nil {
-				fmt.Println("Joypad disconnected, stopping ...")
+				if debug {
+					fmt.Println("Joypad disconnected, stopping ...")
+				}
 				f.Close()
 				break
 			}

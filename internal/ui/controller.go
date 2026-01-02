@@ -20,8 +20,9 @@ type ControllerTab struct {
 	CancelFunc   context.CancelFunc
 }
 
-func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.ControllerConfig) *ControllerTab {
+func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.ControllerConfig, id int) *ControllerTab {
 	state := &AppState{
+		ControllerId:        binding.NewInt(),
 		BatteryValue:        binding.NewFloat(),
 		BatteryText:         binding.NewString(),
 		StateText:           binding.NewString(),
@@ -34,6 +35,7 @@ func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.C
 		LedRGBStaticColor:   binding.NewString(),
 	}
 
+	state.ControllerId.Set(id)
 	state.DeadzoneValue.Set(float64(ctrlConf.Deadzone))
 	state.LedRGBPreference.Set(ctrlConf.LedRGBPreference)
 	state.LedPlayerPreference.Set(ctrlConf.LedPlayerPreference)
