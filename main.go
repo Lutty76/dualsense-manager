@@ -11,6 +11,8 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 )
 
+var Version = "dev"
+
 func main() {
 
 	hidePtr := flag.Bool("hide", false, "Start the application hidden in the system tray")
@@ -23,7 +25,7 @@ func main() {
 	flag.Parse()
 
 	if *versionPtr {
-		fmt.Println("DualSense Manager version 0.1")
+		fmt.Printf("DualSense Manager version %s\n", Version)
 		return
 	}
 

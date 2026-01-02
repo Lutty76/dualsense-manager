@@ -1,7 +1,8 @@
 BINARY_NAME=dualsense-mgr
+VERSION=$(shell git describe --tags --always --dirty)
 
 build:
-	go build -ldflags="-s -w" -o $(BINARY_NAME) .
+	go build -ldflags="-s -w -X main.Version=$(VERSION)" -o $(BINARY_NAME) .
 
 compress:
 	upx --best --lzma $(BINARY_NAME)
