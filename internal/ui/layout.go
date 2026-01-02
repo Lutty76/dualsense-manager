@@ -69,7 +69,10 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 		cc := conf.Controllers[mac]
 		update(&cc)
 		conf.Controllers[mac] = cc
-		config.Save(conf)
+		err := config.Save(conf)
+		if err != nil {
+			fmt.Println("Error saving controller config for", mac, ":", err)
+		}
 	}
 
 	selectDelayWidget := widget.NewSelect(options, func(value string) {
@@ -80,7 +83,11 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 			min, _ := strconv.Atoi(strings.Split(value, " ")[0])
 			conf.IdleMinutes = min
 		}
-		config.Save(conf)
+
+		err := config.Save(conf)
+		if err != nil {
+			fmt.Println("Error saving controller config for", mac, ":", err)
+		}
 	})
 
 	// initialize selection from global config
@@ -97,7 +104,11 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 			percent, _ := strconv.Atoi(strings.Split(value, " ")[0])
 			conf.BatteryAlert = percent
 		}
-		config.Save(conf)
+
+		err := config.Save(conf)
+		if err != nil {
+			fmt.Println("Error saving controller config for", mac, ":", err)
+		}
 	})
 
 	// initialize selection from global config
