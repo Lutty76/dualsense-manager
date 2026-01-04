@@ -60,10 +60,6 @@ func ManageBatteryAndLEDs(ctx context.Context, _ fyne.App, state *ui.AppState, p
 				if err != nil {
 					log.Default().Println("Error setting state text:", err)
 				}
-				err = state.BatteryText.Set("Battery : --%")
-				if err != nil {
-					log.Default().Println("Error setting battery text:", err)
-				}
 				err = state.BatteryValue.Set(0)
 				if err != nil {
 					log.Default().Println("Error setting battery value:", err)
@@ -80,10 +76,6 @@ func ManageBatteryAndLEDs(ctx context.Context, _ fyne.App, state *ui.AppState, p
 			err = state.BatteryValue.Set(float64(level) / 100.0)
 			if err != nil {
 				log.Default().Println("Error setting battery value:", err)
-			}
-			err = state.BatteryText.Set(fmt.Sprintf("Battery : %d%%", level))
-			if err != nil {
-				log.Default().Println("Error setting battery text:", err)
 			}
 			err = state.StateText.Set("State : " + status)
 			if err != nil {
