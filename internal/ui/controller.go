@@ -1,3 +1,4 @@
+// Package ui contains the Fyne UI components and bindings used by the application.
 package ui
 
 import (
@@ -12,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/data/binding"
 )
 
+// ControllerTab represents a UI tab for a single controller.
 type ControllerTab struct {
 	Path         string
 	State        *AppState
@@ -21,9 +23,10 @@ type ControllerTab struct {
 	MacAddress   string
 }
 
+// CreateNewControllerTab builds a `ControllerTab` with bindings and UI widgets.
 func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.ControllerConfig, macAddress string, id int) *ControllerTab {
 	state := &AppState{
-		ControllerId:        binding.NewInt(),
+		ControllerID:        binding.NewInt(),
 		BatteryValue:        binding.NewFloat(),
 		BatteryText:         binding.NewString(),
 		StateText:           binding.NewString(),
@@ -36,7 +39,7 @@ func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.C
 		LedRGBStaticColor:   binding.NewString(),
 	}
 
-	err := state.ControllerId.Set(id)
+	err := state.ControllerID.Set(id)
 	if err != nil {
 		fmt.Println("Error setting controller ID:", err)
 	}

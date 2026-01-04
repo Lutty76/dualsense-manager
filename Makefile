@@ -12,3 +12,6 @@ clean:
 
 install:
 	sudo cp $(BINARY_NAME) /usr/local/bin/
+
+lint:
+	golangci-lint run ./...

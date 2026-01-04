@@ -1,0 +1,21 @@
+version: 2
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - ineffassign
+    - unused
+    - revive
+    - revive
+
+issues:
+  exclude-use-default: false
+  max-same-issues: 3
+  exclude:
+    - "error return value not checked.*(Close|Write).*$"
+    - "should have comment or be unexported"

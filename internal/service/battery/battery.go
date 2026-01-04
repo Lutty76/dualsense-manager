@@ -1,20 +1,29 @@
-package service
+// Package battery provides functions to read the battery status of a DualSense controller.
+package battery
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"dualsense/internal/sysfs"
 )
 
+// Battery interface defines methods to read battery information.
+type Battery interface {
+	ActualBatteryLevel(jsPath string) (int, error)
+	ChargingStatus(jsPath string) (string, error)
+}
+
+// ActualBatteryLevel reads the capacity file and returns the current battery percent.
 func ActualBatteryLevel(jsPath string) (int, error) {
 	basePath, err := batteryPath(jsPath)
 	if err != nil {
 		return 0, err
 	}
 
-	data, err := os.ReadFile(filepath.Join(basePath, "capacity"))
+	data, err := sysfs.FS.ReadFile(filepath.Join(basePath, "capacity"))
 	if err != nil {
 		return 0, err
 	}
@@ -27,13 +36,14 @@ func ActualBatteryLevel(jsPath string) (int, error) {
 	return level, nil
 }
 
+// ChargingStatus returns the charging status string for the controller battery.
 func ChargingStatus(jsPath string) (string, error) {
 	basePath, err := batteryPath(jsPath)
 	if err != nil {
 		return "", err
 	}
 
-	data, err := os.ReadFile(filepath.Join(basePath, "status"))
+	data, err := sysfs.FS.ReadFile(filepath.Join(basePath, "status"))
 	if err != nil {
 		return "", err
 	}
@@ -42,10 +52,8 @@ func ChargingStatus(jsPath string) (string, error) {
 }
 
 func batteryPath(jsPath string) (string, error) {
-
 	devicePath := fmt.Sprintf("/sys/class/input/%s/device/device/power_supply", filepath.Base(jsPath))
-
-	matches, err := filepath.Glob(filepath.Join(devicePath, "ps-controller-battery-*"))
+	matches, err := sysfs.FS.Glob(filepath.Join(devicePath, "ps-controller-battery-*"))
 	if err != nil {
 		return "", err
 	}

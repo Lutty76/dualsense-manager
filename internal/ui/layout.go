@@ -1,3 +1,4 @@
+// Package ui contains the Fyne UI components and bindings used by the application.
 package ui
 
 import (
@@ -18,8 +19,9 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+// AppState contains data bindings representing a controller UI state.
 type AppState struct {
-	ControllerId        binding.Int
+	ControllerID        binding.Int
 	BatteryValue        binding.Float
 	BatteryText         binding.String
 	StateText           binding.String
@@ -32,6 +34,7 @@ type AppState struct {
 	LedRGBStaticColor   binding.String
 }
 
+// Player and RGB modes used in UI selections.
 const (
 	PlayerModeBattery = 0
 	PlayerModeNumber  = 1
@@ -52,6 +55,7 @@ var rgbOptions = map[int]string{
 	RGBModeOff:     "Disable",
 }
 
+// CreateContent builds the controller UI content for a tab.
 func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state *AppState) fyne.CanvasObject {
 	options := []string{"1 min", "2 min", "5 min", "10 min", "20 min", "30 min", "40 min", "Never"}
 	optionsBattery := []string{"5 %", "15 %", "25 %", "Never"}
@@ -87,12 +91,12 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 		if value == "Never" {
 			conf.IdleMinutes = 0
 		} else {
-			min, err := strconv.Atoi(strings.Split(value, " ")[0])
+			minutes, err := strconv.Atoi(strings.Split(value, " ")[0])
 			if err != nil {
 				log.Default().Printf("Unable to parse delay : %s", value)
 				return
 			}
-			conf.IdleMinutes = min
+			conf.IdleMinutes = minutes
 		}
 
 		err := config.Save(conf)
@@ -278,14 +282,14 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 		}
 	}
 
-	controllerId, err := state.ControllerId.Get()
+	controllerID, err := state.ControllerID.Get()
 	if err != nil {
 		log.Default().Println("Error getting controller ID:", err)
-		controllerId = 0
+		controllerID = 0
 	}
 
 	return container.NewVBox(
-		widget.NewLabel("Controller n°"+strconv.Itoa(controllerId)),
+		widget.NewLabel("Controller n°"+strconv.Itoa(controllerID)),
 		widget.NewLabelWithData(state.BatteryText),
 		widget.NewProgressBarWithData(state.BatteryValue),
 		widget.NewLabelWithData(state.StateText),

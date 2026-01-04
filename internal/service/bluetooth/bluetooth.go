@@ -1,24 +1,33 @@
-package service
+// Package bluetooth provides functions to interact with Bluetooth features of DualSense controllers.
+package bluetooth
 
 import (
 	"fmt"
 	"log"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/godbus/dbus/v5"
+
+	"dualsense/internal/sysfs"
 )
 
+// Bluetooth interface defines methods for Bluetooth operations.
+type Bluetooth interface {
+	ControllerMAC(path string) string
+	DisconnectDualSenseNative(mac string) error
+}
+
+// ControllerMAC reads the controller MAC from sysfs for the given device path.
 func ControllerMAC(path string) string {
 	devName := filepath.Base(path)
 
 	macPath := fmt.Sprintf("/sys/class/input/%s/device/uniq", devName)
 
-	data, err := os.ReadFile(macPath)
+	data, err := sysfs.FS.ReadFile(macPath)
 	if err != nil {
 		macPath = fmt.Sprintf("/sys/class/input/%s/device/address", devName)
-		data, err = os.ReadFile(macPath)
+		data, err = sysfs.FS.ReadFile(macPath)
 	}
 
 	if err != nil {
@@ -28,8 +37,10 @@ func ControllerMAC(path string) string {
 	mac := strings.TrimSpace(string(data))
 	return strings.ToUpper(mac)
 }
+
+// DisconnectDualSenseNative requests BlueZ to disconnect the device with the given MAC.
 func DisconnectDualSenseNative(mac string) error {
-	conn, err := dbus.ConnectSystemBus()
+	conn, err := ConnectSystemBus()
 	if err != nil {
 		return err
 	}
@@ -46,3 +57,6 @@ func DisconnectDualSenseNative(mac string) error {
 	return call.Err
 
 }
+
+// ConnectSystemBus is a hook for tests to override D-Bus connection behavior.
+var ConnectSystemBus = dbus.ConnectSystemBus
