@@ -4,7 +4,7 @@ import (
 	"dualsense/internal/config"
 	"dualsense/internal/service"
 	"flag"
-	"fmt"
+	"log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -25,13 +25,13 @@ func main() {
 	flag.Parse()
 
 	if *versionPtr {
-		fmt.Printf("DualSense Manager version %s\n", Version)
+		log.Default().Printf("DualSense Manager version %s\n", Version)
 		return
 	}
 
 	conf, err := config.Load()
 	if err != nil {
-		fmt.Println("Error loading configuration:", err)
+		log.Fatalf("Error loading configuration: %s\n", err)
 		return
 	}
 	myApp := app.NewWithID("com.dualsense.manager")
@@ -53,7 +53,8 @@ func main() {
 		myWindow.Hide()
 	})
 
-	controllerTabs := service.StartControllerManager(myApp, conf, *debugPtr)
+	service.Debug = *debugPtr
+	controllerTabs := service.StartControllerManager(myApp, conf)
 
 	myWindow.SetContent(controllerTabs)
 	myWindow.Resize(fyne.NewSize(300, 300))

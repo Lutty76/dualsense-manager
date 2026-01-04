@@ -36,20 +36,41 @@ func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.C
 		LedRGBStaticColor:   binding.NewString(),
 	}
 
-	state.ControllerId.Set(id)
-	state.DeadzoneValue.Set(float64(ctrlConf.Deadzone))
-	state.LedRGBPreference.Set(ctrlConf.LedRGBPreference)
-	state.LedPlayerPreference.Set(ctrlConf.LedPlayerPreference)
-	state.MacText.Set("MAC : " + macAddress)
+	err := state.ControllerId.Set(id)
+	if err != nil {
+		fmt.Println("Error setting controller ID:", err)
+	}
+	err = state.DeadzoneValue.Set(float64(ctrlConf.Deadzone))
+	if err != nil {
+		fmt.Println("Error setting deadzone value:", err)
+	}
+	err = state.LedRGBPreference.Set(ctrlConf.LedRGBPreference)
+	if err != nil {
+		fmt.Println("Error setting LED RGB preference:", err)
+	}
+	err = state.LedPlayerPreference.Set(ctrlConf.LedPlayerPreference)
+	if err != nil {
+		fmt.Println("Error setting LED player preference:", err)
+	}
+	err = state.MacText.Set("MAC : " + macAddress)
+	if err != nil {
+		fmt.Println("Error setting MAC text:", err)
+	}
 	// initialize static RGB color binding without leading '#'
 	if ctrlConf.LedRGBStatic != "" {
-		state.LedRGBStaticColor.Set(strings.TrimPrefix(ctrlConf.LedRGBStatic, "#"))
+		err = state.LedRGBStaticColor.Set(strings.TrimPrefix(ctrlConf.LedRGBStatic, "#"))
+		if err != nil {
+			fmt.Println("Error setting LED RGB static color:", err)
+		}
 	}
 	initialValue := fmt.Sprintf("%d min", conf.IdleMinutes)
 	if conf.IdleMinutes == 0 {
 		initialValue = "Jamais"
 	}
-	state.SelectedDuration.Set(initialValue)
+	err = state.SelectedDuration.Set(initialValue)
+	if err != nil {
+		fmt.Println("Error setting selected duration:", err)
+	}
 
 	activityChan := make(chan time.Time)
 

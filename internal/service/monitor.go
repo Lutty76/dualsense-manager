@@ -3,24 +3,22 @@ package service
 import (
 	"dualsense/internal/ui"
 	"encoding/binary"
-	"fmt"
+	"log"
 	"os"
 	"time"
 )
 
-func MonitorJoystick(path string, activityChan chan time.Time, state *ui.AppState, debug bool) {
-	if debug {
-		fmt.Println("Starting joystick monitor for controller at path:", path)
+func MonitorJoystick(path string, activityChan chan time.Time, state *ui.AppState) {
+	if Debug {
+		log.Default().Println("Starting joystick monitor for controller at path:", path)
 	}
 
 	for {
-		f, err := os.Open(path)
+		f, err := os.Open(path) // Should be close a the end of loop ?
 		if err != nil {
 			time.Sleep(5 * time.Second)
 			continue
-
 		}
-		defer f.Close()
 
 		// Structure d'un événement joystick Linux (8 octets)
 		// Time (4) | Value (2) | Type (1) | Index (1)
@@ -29,10 +27,9 @@ func MonitorJoystick(path string, activityChan chan time.Time, state *ui.AppStat
 		for {
 			_, err := f.Read(buffer)
 			if err != nil {
-				if debug {
-					fmt.Println("Stopping joystick monitor for controller at path:", path)
+				if Debug {
+					log.Default().Println("Stopping joystick monitor for controller at path:", path)
 				}
-				f.Close()
 				break
 			}
 			val, err := state.DeadzoneValue.Get()
@@ -48,18 +45,23 @@ func MonitorJoystick(path string, activityChan chan time.Time, state *ui.AppStat
 			switch evType {
 			case 1: // Bouton pressé
 				isReal = true
-				if debug {
-					fmt.Printf("Button %d event detected with value: %d\n", buffer[7], evValue)
+				if Debug {
+					log.Default().Printf("Button %d event detected with value: %d\n", buffer[7], evValue)
 				}
 			case 2: // Axe bougé
 				if evValue > deadzone || evValue < -deadzone {
 					isReal = true
-					if debug {
-						fmt.Printf("Axis %d event detected with value: %d\n", buffer[7], evValue)
+					if Debug {
+						log.Default().Printf("Axis %d event detected with value: %d\n", buffer[7], evValue)
 					}
 				} else {
-					if debug {
-						fmt.Printf("Axis %d event ignored due to deadzone with value: %d\n", buffer[7], evValue)
+					if Debug {
+						log.Default().Printf("Axis %d event ignored due to deadzone with value: %d\n", buffer[7], evValue)
+					}
+					// Close file before retrying to avoid accumulating open descriptors
+					err = f.Close()
+					if err != nil {
+						log.Default().Println("Error closing joystick file:", err)
 					}
 				}
 			}

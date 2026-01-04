@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -44,13 +45,13 @@ func RunChargingAnimation(ctx context.Context, jsPath string) {
 
 }
 
-func RunRGBChargingAnimation(ctx context.Context, jsPath string, batteryLevel chan float64, debug bool) {
+func RunRGBChargingAnimation(ctx context.Context, hidPath string, batteryLevel chan float64) {
 	ticker := time.NewTicker(25 * time.Millisecond) // Animation fluide
 	defer ticker.Stop()
 
 	percent := <-batteryLevel
-	if debug {
-		fmt.Println("Starting RGB charging animation with battery level:", percent)
+	if Debug {
+		log.Default().Println("Starting RGB charging animation with battery level:", percent)
 	}
 	// On calcule la couleur cible une fois au début
 	baseR, baseG := 255, 255
@@ -66,8 +67,8 @@ func RunRGBChargingAnimation(ctx context.Context, jsPath string, batteryLevel ch
 		case <-ctx.Done():
 			return
 		case percent := <-batteryLevel:
-			if debug {
-				fmt.Println("updating RGB charging animation with battery level:", percent)
+			if Debug {
+				log.Default().Println("updating RGB charging animation with battery level:", percent)
 			}
 			baseR, baseG = 255, 255
 			if percent > 50 {
@@ -82,7 +83,7 @@ func RunRGBChargingAnimation(ctx context.Context, jsPath string, batteryLevel ch
 			r := int(float64(baseR) * brightness)
 			g := int(float64(baseG) * brightness)
 
-			setLightbarRGB(jsPath, r, g, 0)
+			setLightbarRGB(hidPath, r, g, 0)
 
 			theta += 0.1
 			if theta > 2*math.Pi {
@@ -109,13 +110,9 @@ func SetBatteryColor(jsPath string, percent float64) {
 func SetBatteryLeds(jsPath string, percent float64) {
 	ledBase := getLedPath(jsPath)
 
-	// Définition des paliers
-	// player-1 et 5 : Extrémités
-	// player-2 et 4 : Intermédiaires
-	// player-3      : Centre
-	p15 := "0" // Off
-	p24 := "0"
-	p3 := "0"
+	var p15 string
+	var p24 string
+	var p3 string
 	blink := false
 
 	if percent >= 75 {
@@ -192,7 +189,7 @@ func applyLed(basePath, ledName, value string) {
 
 	matches, err := filepath.Glob(filepath.Join(basePath, "*:"+ledName))
 	if err != nil {
-		fmt.Println("Error finding LED path:", err)
+		log.Default().Println("Error finding LED path:", err)
 		return
 	}
 	if len(matches) == 0 {
@@ -203,7 +200,7 @@ func applyLed(basePath, ledName, value string) {
 
 	err = os.WriteFile(filepath.Join(path, "brightness"), []byte(value), 0644)
 	if err != nil {
-		fmt.Println("Error writing LED value:", err)
+		log.Default().Println("Error writing LED value:", err)
 	}
 
 }
@@ -225,10 +222,14 @@ func getLedPath(jsPath string) string {
 }
 
 func setLightbarRGB(jsPath string, r, g, b int) {
+	if Debug {
+		log.Default().Printf("Setting lightbar RGB to R:%d G:%d B:%d\n", r, g, b)
+	}
+
 	basePath := getLedPath(jsPath)
 	matches, err := filepath.Glob(filepath.Join(basePath, "*:rgb:indicator"))
 	if err != nil {
-		fmt.Println("Error finding RGB path:", err)
+		log.Default().Println("Error finding RGB path:", err)
 		return
 	}
 	if len(matches) == 0 {
@@ -236,16 +237,21 @@ func setLightbarRGB(jsPath string, r, g, b int) {
 	}
 
 	path := matches[0]
+
+	if Debug {
+		log.Default().Println("RGB LED path found at:", path)
+	}
+
 	// Le format standard pour multi_intensity est "R G B" (0-255)
 	colorStr := fmt.Sprintf("%d %d %d", r, g, b)
 	err = os.WriteFile(filepath.Join(path, "multi_intensity"), []byte(colorStr), 0644)
 	if err != nil {
-		fmt.Println("Error writing RGB value:", err)
+		log.Default().Println("Error writing RGB value:", err)
 	}
 
 	// On s'assure que la luminosité globale est au max
 	err = os.WriteFile(filepath.Join(path, "brightness"), []byte("255"), 0644)
 	if err != nil {
-		fmt.Println("Error writing brightness value:", err)
+		log.Default().Println("Error writing brightness value:", err)
 	}
 }

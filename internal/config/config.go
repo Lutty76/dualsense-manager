@@ -99,7 +99,7 @@ func Load() (*Config, error) {
 
 	err = yaml.Unmarshal(data, conf)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	return conf, nil

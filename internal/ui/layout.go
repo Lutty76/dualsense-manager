@@ -3,6 +3,7 @@ package ui
 import (
 	"dualsense/internal/config"
 	"fmt"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -74,18 +75,21 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 		conf.Controllers[mac] = cc
 		err := config.Save(conf)
 		if err != nil {
-			fmt.Println("Error saving controller config for", mac, ":", err)
+			log.Default().Println("Error saving controller config for", mac, ":", err)
 		}
 	}
 
 	selectDelayWidget := widget.NewSelect(options, func(value string) {
-		state.SelectedDuration.Set(value)
+		err = state.SelectedDuration.Set(value)
+		if err != nil {
+			log.Default().Println("Error setting selected duration:", err)
+		}
 		if value == "Never" {
 			conf.IdleMinutes = 0
 		} else {
 			min, err := strconv.Atoi(strings.Split(value, " ")[0])
 			if err != nil {
-				fmt.Printf("Unable to parse delay : %s", value)
+				log.Default().Printf("Unable to parse delay : %s", value)
 				return
 			}
 			conf.IdleMinutes = min
@@ -93,7 +97,7 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 
 		err := config.Save(conf)
 		if err != nil {
-			fmt.Println("Error saving controller config for", mac, ":", err)
+			log.Default().Println("Error saving controller config for", mac, ":", err)
 		}
 	})
 
@@ -110,7 +114,7 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 		} else {
 			percent, err := strconv.Atoi(strings.Split(value, " ")[0])
 			if err != nil {
-				fmt.Printf("Unable to parse battery alert : %s", value)
+				log.Default().Printf("Unable to parse battery alert : %s", value)
 				return
 			}
 			conf.BatteryAlert = percent
@@ -118,7 +122,7 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 
 		err := config.Save(conf)
 		if err != nil {
-			fmt.Println("Error saving controller config for", mac, ":", err)
+			log.Default().Println("Error saving controller config for", mac, ":", err)
 		}
 	})
 
@@ -147,7 +151,11 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 		deadzoneLabel.SetText(fmt.Sprintf("Deadzone : %d", val))
 		// save per-controller if mac known
 		if mac != "" {
-			state.DeadzoneValue.Set(v)
+			err = state.DeadzoneValue.Set(v)
+			if err != nil {
+				log.Default().Println("Error setting deadzone value:", err)
+			}
+
 			saveCtrl(mac, func(cc *config.ControllerConfig) { cc.Deadzone = val })
 		}
 	}
@@ -157,7 +165,10 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 	ledSelect := widget.NewSelect(names, func(selected string) {
 		for id, name := range playerOptions {
 			if name == selected {
-				state.LedPlayerPreference.Set(id)
+				err = state.LedPlayerPreference.Set(id)
+				if err != nil {
+					log.Default().Println("Error setting LED player preference:", err)
+				}
 				if mac != "" {
 					saveCtrl(mac, func(cc *config.ControllerConfig) { cc.LedPlayerPreference = id })
 				}
@@ -250,7 +261,10 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 	rgbSelect.OnChanged = func(selected string) {
 		for id, name := range rgbOptions {
 			if name == selected {
-				state.LedRGBPreference.Set(id)
+				err = state.LedRGBPreference.Set(id)
+				if err != nil {
+					log.Default().Println("Error setting LED RGB preference:", err)
+				}
 				if mac != "" {
 					saveCtrl(mac, func(cc *config.ControllerConfig) { cc.LedRGBPreference = id })
 				}
@@ -266,7 +280,7 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 
 	controllerId, err := state.ControllerId.Get()
 	if err != nil {
-		fmt.Println("Error getting controller ID:", err)
+		log.Default().Println("Error getting controller ID:", err)
 		controllerId = 0
 	}
 

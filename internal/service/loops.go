@@ -5,6 +5,7 @@ import (
 	"dualsense/internal/config"
 	"dualsense/internal/ui"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -15,7 +16,11 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState, path string, id int, debug bool) {
+var (
+	Debug bool
+)
+
+func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState, path string, id int) {
 	var animCancelPlayer context.CancelFunc = func() {}
 	var animCancelRGB context.CancelFunc = func() {}
 	var animActivePlayer bool
@@ -23,16 +28,16 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 	batteryChan := make(chan float64)
 	previousLevel := -1
 
-	if debug {
-		fmt.Println("Starting battery loop for controller at path:", path)
+	if Debug {
+		log.Default().Println("Starting battery loop for controller at path:", path)
 	}
 
 	// Au cas où la goroutine principale s'arrête, on nettoie l'animation
 	defer func() {
 		animCancelPlayer()
 		animCancelRGB()
-		if debug {
-			fmt.Println("Stopping battery loop for controller at path:", path)
+		if Debug {
+			log.Default().Println("Stopping battery loop for controller at path:", path)
 		}
 	}()
 
@@ -45,9 +50,18 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 		default:
 			level, err := ActualBatteryLevel(path)
 			if err != nil {
-				state.StateText.Set("Dualsense not found")
-				state.BatteryText.Set("Battery : --%")
-				state.BatteryValue.Set(0)
+				err = state.StateText.Set("Dualsense not found")
+				if err != nil {
+					log.Default().Println("Error setting state text:", err)
+				}
+				err = state.BatteryText.Set("Battery : --%")
+				if err != nil {
+					log.Default().Println("Error setting battery text:", err)
+				}
+				err = state.BatteryValue.Set(0)
+				if err != nil {
+					log.Default().Println("Error setting battery value:", err)
+				}
 				time.Sleep(5 * time.Second)
 				continue
 			}
@@ -57,9 +71,18 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 			}
 
 			// Mise à jour de l'UI Fyne
-			state.BatteryValue.Set(float64(level) / 100.0)
-			state.BatteryText.Set(fmt.Sprintf("Battery : %d%%", level))
-			state.StateText.Set("State : " + status)
+			err = state.BatteryValue.Set(float64(level) / 100.0)
+			if err != nil {
+				log.Default().Println("Error setting battery value:", err)
+			}
+			err = state.BatteryText.Set(fmt.Sprintf("Battery : %d%%", level))
+			if err != nil {
+				log.Default().Println("Error setting battery text:", err)
+			}
+			err = state.StateText.Set("State : " + status)
+			if err != nil {
+				log.Default().Println("Error setting state text:", err)
+			}
 			if level != previousLevel {
 				select {
 				case batteryChan <- float64(level):
@@ -105,7 +128,7 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 					var animCtxRGB context.Context
 					animCtxRGB, animCancelRGB = context.WithCancel(ctx)
 					animActiveRGB = true
-					go RunRGBChargingAnimation(animCtxRGB, path, batteryChan, debug)
+					go RunRGBChargingAnimation(animCtxRGB, path, batteryChan)
 					if level != previousLevel {
 						select {
 						case batteryChan <- float64(level):
@@ -142,10 +165,10 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 		}
 	}
 }
-func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan chan time.Time, path string, debug bool) {
+func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan chan time.Time, path string) {
 
-	if debug {
-		fmt.Println("Starting activity loop for controller at path:", path)
+	if Debug {
+		log.Default().Println("Starting activity loop for controller at path:", path)
 	}
 
 	lastActivityTime := time.Now()
@@ -153,13 +176,16 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 	for {
 		select {
 		case <-ctx.Done(): // Si on annule le contexte, on arrête TOUT
-			if debug {
-				fmt.Println("Stopping activity loop for controller at path:", path)
+			if Debug {
+				log.Default().Println("Stopping activity loop for controller at path:", path)
 			}
 			return
 		case t := <-activityChan:
 			lastActivityTime = t
-			state.LastActivityBinding.Set("In use")
+			err := state.LastActivityBinding.Set("In use")
+			if err != nil {
+				log.Default().Println("Error setting last activity binding:", err)
+			}
 		case <-ticker.C:
 			status, err := state.StateText.Get()
 			if err != nil {
@@ -168,7 +194,10 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 
 			if strings.Contains(status, "not found") || strings.Contains(status, "Recherche") {
 				lastActivityTime = time.Now()
-				state.LastActivityBinding.Set("Disconnected")
+				err = state.LastActivityBinding.Set("Disconnected")
+				if err != nil {
+					log.Default().Println("Error setting last activity binding:", err)
+				}
 				continue
 			}
 			diff := time.Since(lastActivityTime)
@@ -183,11 +212,17 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 			}
 
 			if currentChoice == "Jamais" {
-				state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s (Auto-off Disabled)", diff.Truncate(time.Second)))
+				err = state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s (Auto-off Disabled)", diff.Truncate(time.Second)))
+				if err != nil {
+					log.Default().Println("Error setting last activity binding:", err)
+				}
 				continue
 			}
 			if strings.Contains(status, "Charging") || strings.Contains(status, "Full") {
-				state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s (disabled due to charging)", diff.Truncate(time.Second)))
+				err = state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s (disabled due to charging)", diff.Truncate(time.Second)))
+				if err != nil {
+					log.Default().Println("Error setting last activity binding:", err)
+				}
 				continue
 			}
 
@@ -198,10 +233,12 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 			}
 
 			limit := time.Duration(minutes) * time.Minute
-			state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s / %s", diff.Truncate(time.Second), currentChoice))
-
+			err = state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s / %s", diff.Truncate(time.Second), currentChoice))
+			if err != nil {
+				log.Default().Println("Error setting last activity binding:", err)
+			}
 			if diff > limit {
-				fmt.Println("Auto disconnect !")
+				log.Default().Println("Auto disconnect !")
 				// prefer cached MAC from UI state to avoid repeated sysfs reads
 				macText, err := state.MacText.Get()
 				if err != nil {
@@ -211,7 +248,7 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 				if mac != "" {
 					err := DisconnectDualSenseNative(mac)
 					if err != nil {
-						fmt.Println("Fail D-Bus:", err)
+						log.Default().Println("Fail D-Bus:", err)
 					}
 				}
 			}
@@ -220,9 +257,9 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 
 }
 
-func StartControllerManager(myApp fyne.App, conf *config.Config, debug bool) *container.AppTabs {
-	if debug {
-		fmt.Println("StartControllerManager: debug mode enabled")
+func StartControllerManager(myApp fyne.App, conf *config.Config) *container.AppTabs {
+	if Debug {
+		log.Default().Println("StartControllerManager: Debug mode enabled")
 	}
 	emptyTab := container.NewTabItem("Info", widget.NewLabel("Waiting for DualSense..."))
 	tabs := container.NewAppTabs(emptyTab)
@@ -247,7 +284,7 @@ func StartControllerManager(myApp fyne.App, conf *config.Config, debug bool) *co
 		for {
 			foundPaths, err := FindAllDualSense()
 			if err != nil {
-				fmt.Println("Error finding DualSense controllers:", err)
+				log.Default().Println("Error finding DualSense controllers:", err)
 				return
 			}
 			changed := false
@@ -255,8 +292,8 @@ func StartControllerManager(myApp fyne.App, conf *config.Config, debug bool) *co
 			for id, path := range foundPaths {
 				if _, exists := activeControllers[path]; !exists {
 
-					if debug {
-						fmt.Println("New DualSense detected at path:", path)
+					if Debug {
+						log.Default().Println("New DualSense detected at path:", path)
 					}
 
 					ctx, cancel := context.WithCancel(context.Background())
@@ -266,9 +303,9 @@ func StartControllerManager(myApp fyne.App, conf *config.Config, debug bool) *co
 					newTab.CancelFunc = cancel
 					activeControllers[path] = newTab
 
-					go MonitorJoystick(path, newTab.ActivityChan, newTab.State, debug)
-					go ManageBatteryAndLEDs(ctx, myApp, newTab.State, path, id+1, debug)
-					go StartActivityLoop(ctx, newTab.State, newTab.ActivityChan, path, debug)
+					go MonitorJoystick(path, newTab.ActivityChan, newTab.State)
+					go ManageBatteryAndLEDs(ctx, myApp, newTab.State, path, id+1)
+					go StartActivityLoop(ctx, newTab.State, newTab.ActivityChan, path)
 
 					changed = true
 				}
