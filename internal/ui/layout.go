@@ -23,7 +23,6 @@ import (
 type AppState struct {
 	ControllerID        binding.Int
 	BatteryValue        binding.Float
-	BatteryText         binding.String
 	StateText           binding.String
 	LastActivityBinding binding.String
 	MacText             binding.String
@@ -290,7 +289,7 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 
 	return container.NewVBox(
 		widget.NewLabel("Controller n°"+strconv.Itoa(controllerID)),
-		widget.NewLabelWithData(state.BatteryText),
+		widget.NewLabel("Battery :"),
 		widget.NewProgressBarWithData(state.BatteryValue),
 		widget.NewLabelWithData(state.StateText),
 		widget.NewLabelWithData(state.MacText),

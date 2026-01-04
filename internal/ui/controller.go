@@ -28,7 +28,6 @@ func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.C
 	state := &AppState{
 		ControllerID:        binding.NewInt(),
 		BatteryValue:        binding.NewFloat(),
-		BatteryText:         binding.NewString(),
 		StateText:           binding.NewString(),
 		LastActivityBinding: binding.NewString(),
 		MacText:             binding.NewString(),
