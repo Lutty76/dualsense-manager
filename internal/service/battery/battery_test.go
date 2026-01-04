@@ -26,7 +26,7 @@ func (f fakeFS) WriteFile(_ string, _ []byte, _ os.FileMode) error {
 func (f fakeFS) Glob(pattern string) ([]string, error) { return f.globs[pattern], nil }
 func (f fakeFS) Stat(_ string) (os.FileInfo, error)    { return nil, fmt.Errorf("not implemented") }
 
-func TestActualBatteryLevelAndChargingStatus(t *testing.T) {
+func TestActualBatteryLevel(t *testing.T) {
 	old := sysfs.FS
 	fake := fakeFS{
 		files: map[string][]byte{},
@@ -40,7 +40,6 @@ func TestActualBatteryLevelAndChargingStatus(t *testing.T) {
 
 	fake.globs[globPattern] = []string{baseMatch}
 	fake.files[filepath.Join(baseMatch, "capacity")] = []byte("85\n")
-	fake.files[filepath.Join(baseMatch, "status")] = []byte("Charging\n")
 
 	sysfs.FS = fake
 	defer func() { sysfs.FS = old }()
@@ -52,6 +51,26 @@ func TestActualBatteryLevelAndChargingStatus(t *testing.T) {
 	if level != 85 {
 		t.Fatalf("expected 85 got %d", level)
 	}
+
+}
+
+func TestChargingStatus(t *testing.T) {
+	old := sysfs.FS
+	fake := fakeFS{
+		files: map[string][]byte{},
+		globs: map[string][]string{},
+	}
+
+	jsPath := "/dev/input/js0"
+	devicePath := filepath.Join("/sys/class/input", filepath.Base(jsPath), "device/device/power_supply")
+	globPattern := filepath.Join(devicePath, "ps-controller-battery-*")
+	baseMatch := "/sys/class/power_supply/ps-controller-battery-0"
+
+	fake.globs[globPattern] = []string{baseMatch}
+	fake.files[filepath.Join(baseMatch, "status")] = []byte("Charging\n")
+
+	sysfs.FS = fake
+	defer func() { sysfs.FS = old }()
 
 	status, err := ChargingStatus(jsPath)
 	if err != nil {
