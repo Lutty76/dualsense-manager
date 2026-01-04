@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,8 +33,13 @@ func DisconnectDualSenseNative(mac string) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() {
+		err = conn.Close()
+		if err != nil {
+			log.Default().Println("Error closing D-Bus connection:", err)
+		}
 
+	}()
 	dbusPath := "/org/bluez/hci0/dev_" + strings.ReplaceAll(mac, ":", "_")
 	obj := conn.Object("org.bluez", dbus.ObjectPath(dbusPath))
 	call := obj.Call("org.bluez.Device1.Disconnect", 0)

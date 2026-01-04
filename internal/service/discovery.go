@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,7 +18,7 @@ func FindAllDualSense() ([]string, error) {
 		namePath := fmt.Sprintf("/sys/class/input/%s/device/name", filepath.Base(path))
 		nameBytes, err := os.ReadFile(namePath)
 		if err != nil {
-			fmt.Printf("Unable to read %s", namePath)
+			log.Default().Printf("Unable to read %s :%s\n", namePath, err)
 			continue
 		}
 		name := strings.ToLower(string(nameBytes))

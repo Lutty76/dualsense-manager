@@ -8,8 +8,6 @@ import (
 	"strings"
 )
 
-const powerPath = "/sys/class/power_supply/ps-controller-battery-*/"
-
 func ActualBatteryLevel(jsPath string) (int, error) {
 	basePath, err := batteryPath(jsPath)
 	if err != nil {
@@ -54,5 +52,5 @@ func batteryPath(jsPath string) (string, error) {
 	if len(matches) > 0 {
 		return matches[0], nil
 	}
-	return "", fmt.Errorf("Battery path not found")
+	return "", fmt.Errorf("battery path not found")
 }
