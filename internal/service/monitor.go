@@ -3,18 +3,26 @@ package service
 import (
 	"dualsense/internal/ui"
 	"encoding/binary"
+	"io"
 	"log"
 	"os"
 	"time"
 )
 
+// OpenJoystick is the function used to open joystick device files.
+// It is a package-level variable so tests can override it with a fake implementation.
+var OpenJoystick = func(path string) (io.ReadCloser, error) {
+	return os.Open(path)
+}
+
+// MonitorJoystick reads joystick events and notifies activity via activityChan.
 func MonitorJoystick(path string, activityChan chan time.Time, state *ui.AppState) {
 	if Debug {
 		log.Default().Println("Starting joystick monitor for controller at path:", path)
 	}
 
 	for {
-		f, err := os.Open(path) // Should be close a the end of loop ?
+		f, err := OpenJoystick(path)
 		if err != nil {
 			time.Sleep(5 * time.Second)
 			continue
@@ -25,13 +33,14 @@ func MonitorJoystick(path string, activityChan chan time.Time, state *ui.AppStat
 		buffer := make([]byte, 8)
 
 		for {
-			_, err := f.Read(buffer)
+			_, err := io.ReadFull(f, buffer)
 			if err != nil {
 				if Debug {
 					log.Default().Println("Stopping joystick monitor for controller at path:", path)
 				}
 				break
 			}
+
 			val, err := state.DeadzoneValue.Get()
 			if err != nil {
 				val = 1500
@@ -58,17 +67,17 @@ func MonitorJoystick(path string, activityChan chan time.Time, state *ui.AppStat
 					if Debug {
 						log.Default().Printf("Axis %d event ignored due to deadzone with value: %d\n", buffer[7], evValue)
 					}
-					// Close file before retrying to avoid accumulating open descriptors
-					err = f.Close()
-					if err != nil {
-						log.Default().Println("Error closing joystick file:", err)
-					}
 				}
 			}
 
 			if isReal {
 				activityChan <- time.Now()
 			}
+		}
+
+		// Close file before retrying to avoid accumulating open descriptors
+		if err := f.Close(); err != nil {
+			log.Default().Println("Error closing joystick file:", err)
 		}
 	}
 }

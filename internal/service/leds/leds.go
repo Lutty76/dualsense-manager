@@ -1,15 +1,27 @@
-package service
+// Package leds provides functions to control the LEDs of a DualSense controller.
+package leds
 
 import (
 	"context"
 	"fmt"
-	"log"
 	"math"
-	"os"
 	"path/filepath"
 	"time"
+
+	"dualsense/internal/sysfs"
 )
 
+// Leds interface defines methods to control DualSense LEDs.
+type Leds interface {
+	RunChargingAnimation(ctx context.Context, jsPath string)
+	RunRGBChargingAnimation(ctx context.Context, hidPath string, batteryLevel chan float64)
+	SetBatteryColor(jsPath string, percent float64)
+	SetBatteryLeds(jsPath string, percent float64)
+	SetPlayerNumber(jsPath string, id int)
+	SetLightbarRGB(jsPath string, r, g, b int)
+}
+
+// RunChargingAnimation animates player LEDs to indicate charging progress.
 func RunChargingAnimation(ctx context.Context, jsPath string) {
 	ticker := time.NewTicker(800 * time.Millisecond) // Vitesse de l'animation
 	defer ticker.Stop()
@@ -45,14 +57,12 @@ func RunChargingAnimation(ctx context.Context, jsPath string) {
 
 }
 
+// RunRGBChargingAnimation animates the RGB lightbar while charging.
 func RunRGBChargingAnimation(ctx context.Context, hidPath string, batteryLevel chan float64) {
 	ticker := time.NewTicker(25 * time.Millisecond) // Animation fluide
 	defer ticker.Stop()
 
 	percent := <-batteryLevel
-	if Debug {
-		log.Default().Println("Starting RGB charging animation with battery level:", percent)
-	}
 	// On calcule la couleur cible une fois au début
 	baseR, baseG := 255, 255
 	if percent > 50 {
@@ -67,9 +77,6 @@ func RunRGBChargingAnimation(ctx context.Context, hidPath string, batteryLevel c
 		case <-ctx.Done():
 			return
 		case percent := <-batteryLevel:
-			if Debug {
-				log.Default().Println("updating RGB charging animation with battery level:", percent)
-			}
 			baseR, baseG = 255, 255
 			if percent > 50 {
 				baseR = int(255 * (100 - percent) / 50)
@@ -77,13 +84,12 @@ func RunRGBChargingAnimation(ctx context.Context, hidPath string, batteryLevel c
 				baseG = int(255 * percent / 50)
 			}
 		case <-ticker.C:
-			// Utilisation d'un sinus pour une variation fluide (0.2 à 1.0)
 			brightness := 0.6 + 0.4*math.Sin(theta)
 
 			r := int(float64(baseR) * brightness)
 			g := int(float64(baseG) * brightness)
 
-			setLightbarRGB(hidPath, r, g, 0)
+			SetLightbarRGB(hidPath, r, g, 0)
 
 			theta += 0.1
 			if theta > 2*math.Pi {
@@ -93,20 +99,20 @@ func RunRGBChargingAnimation(ctx context.Context, hidPath string, batteryLevel c
 	}
 }
 
+// SetBatteryColor sets the RGB lightbar color based on battery percent.
 func SetBatteryColor(jsPath string, percent float64) {
 	var r, g int
 	if percent > 50 {
-		// De Orange (50%) à Vert (100%)
 		r = int(255 * (100 - percent) / 50)
 		g = 255
 	} else {
-		// De Rouge (0%) à Orange (50%)
 		r = 255
 		g = int(255 * percent / 50)
 	}
-	setLightbarRGB(jsPath, r, g, 0)
+	SetLightbarRGB(jsPath, r, g, 0)
 }
 
+// SetBatteryLeds updates the player LEDs to represent battery level.
 func SetBatteryLeds(jsPath string, percent float64) {
 	ledBase := getLedPath(jsPath)
 
@@ -116,17 +122,17 @@ func SetBatteryLeds(jsPath string, percent float64) {
 	blink := false
 
 	if percent >= 75 {
-		p15, p24, p3 = "1", "1", "1" // XXXXX
+		p15, p24, p3 = "1", "1", "1"
 	} else if percent >= 50 {
-		p15, p24, p3 = "0", "1", "1" // -XXX-
+		p15, p24, p3 = "0", "1", "1"
 	} else if percent >= 20 {
-		p15, p24, p3 = "0", "0", "1" // --X--
+		p15, p24, p3 = "0", "0", "1"
 	} else if percent >= 10 {
-		p15, p24, p3 = "0", "1", "0" // -X-X-
+		p15, p24, p3 = "0", "1", "0"
 		blink = true
 	} else {
-		p15, p24, p3 = "0", "0", "1" // --X--
-		blink = true                 // Clignotant
+		p15, p24, p3 = "0", "0", "1"
+		blink = true
 	}
 
 	applyLed(ledBase, "player-1", p15)
@@ -156,25 +162,24 @@ func SetBatteryLeds(jsPath string, percent float64) {
 	}
 }
 
+// SetPlayerNumber updates the player LEDs to indicate controller number.
 func SetPlayerNumber(jsPath string, id int) {
 	ledBase := getLedPath(jsPath)
 
 	playerNum := id
-	// Reset initial
 	p15, p24, p3 := "0", "0", "0"
 
-	// Logique selon le numéro (en tenant compte des limitations hardware)
 	switch playerNum {
 	case 1:
-		p3 = "1" // Un point au centre
+		p3 = "1"
 	case 2:
-		p24 = "1" // Deux points
+		p24 = "1"
 	case 3:
-		p24, p3 = "1", "1" // Trois points
+		p24, p3 = "1", "1"
 	case 4:
-		p15, p24 = "1", "1" // Quatre points
+		p15, p24 = "1", "1"
 	default:
-		p15, p24, p3 = "1", "1", "1" // Cinq points
+		p15, p24, p3 = "1", "1", "1"
 	}
 
 	applyLed(ledBase, "player-1", p15)
@@ -185,11 +190,8 @@ func SetPlayerNumber(jsPath string, id int) {
 }
 
 func applyLed(basePath, ledName, value string) {
-	// On cherche le dossier qui contient le nom de la LED (ex: input92:white:player-1)
-
-	matches, err := filepath.Glob(filepath.Join(basePath, "*:"+ledName))
+	matches, err := sysfs.FS.Glob(fmt.Sprintf("%s/*:%s", basePath, ledName))
 	if err != nil {
-		log.Default().Println("Error finding LED path:", err)
 		return
 	}
 	if len(matches) == 0 {
@@ -198,38 +200,30 @@ func applyLed(basePath, ledName, value string) {
 
 	path := matches[0]
 
-	err = os.WriteFile(filepath.Join(path, "brightness"), []byte(value), 0644)
-	if err != nil {
-		log.Default().Println("Error writing LED value:", err)
-	}
-
+	_ = sysfs.FS.WriteFile(fmt.Sprintf("%s/brightness", path), []byte(value), 0644)
 }
 
 func getLedPath(jsPath string) string {
 	base := fmt.Sprintf("/sys/class/input/%s/device", filepath.Base(jsPath))
 
-	path := filepath.Join(base, "leds")
-	if _, err := os.Stat(path); err == nil {
+	path := fmt.Sprintf("%s/leds", base)
+	if _, err := sysfs.FS.Stat(path); err == nil {
 		return path
 	}
 
-	path = filepath.Join(base, "device/leds")
-	if _, err := os.Stat(path); err == nil {
+	path = fmt.Sprintf("%s/device/leds", base)
+	if _, err := sysfs.FS.Stat(path); err == nil {
 		return path
 	}
 
 	return ""
 }
 
-func setLightbarRGB(jsPath string, r, g, b int) {
-	if Debug {
-		log.Default().Printf("Setting lightbar RGB to R:%d G:%d B:%d\n", r, g, b)
-	}
-
+// SetLightbarRGB sets the multi_intensity and brightness of the RGB lightbar.
+func SetLightbarRGB(jsPath string, r, g, b int) {
 	basePath := getLedPath(jsPath)
-	matches, err := filepath.Glob(filepath.Join(basePath, "*:rgb:indicator"))
+	matches, err := sysfs.FS.Glob(fmt.Sprintf("%s/*:rgb:indicator", basePath))
 	if err != nil {
-		log.Default().Println("Error finding RGB path:", err)
 		return
 	}
 	if len(matches) == 0 {
@@ -238,20 +232,7 @@ func setLightbarRGB(jsPath string, r, g, b int) {
 
 	path := matches[0]
 
-	if Debug {
-		log.Default().Println("RGB LED path found at:", path)
-	}
-
-	// Le format standard pour multi_intensity est "R G B" (0-255)
 	colorStr := fmt.Sprintf("%d %d %d", r, g, b)
-	err = os.WriteFile(filepath.Join(path, "multi_intensity"), []byte(colorStr), 0644)
-	if err != nil {
-		log.Default().Println("Error writing RGB value:", err)
-	}
-
-	// On s'assure que la luminosité globale est au max
-	err = os.WriteFile(filepath.Join(path, "brightness"), []byte("255"), 0644)
-	if err != nil {
-		log.Default().Println("Error writing brightness value:", err)
-	}
+	_ = sysfs.FS.WriteFile(fmt.Sprintf("%s/multi_intensity", path), []byte(colorStr), 0644)
+	_ = sysfs.FS.WriteFile(fmt.Sprintf("%s/brightness", path), []byte("255"), 0644)
 }

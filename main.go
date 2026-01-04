@@ -1,3 +1,4 @@
+// Command dualsense-mgr provides a system tray UI to monitor DualSense controllers.
 package main
 
 import (

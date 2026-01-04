@@ -1,8 +1,13 @@
+// Package service contains the main service loops for managing DualSense controllers.
 package service
 
 import (
 	"context"
 	"dualsense/internal/config"
+	"dualsense/internal/service/battery"
+	"dualsense/internal/service/bluetooth"
+	"dualsense/internal/service/discovery"
+	"dualsense/internal/service/leds"
 	"dualsense/internal/ui"
 	"fmt"
 	"log"
@@ -17,10 +22,12 @@ import (
 )
 
 var (
+	// Debug enables debug logging within the service package.
 	Debug bool
 )
 
-func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState, path string, id int) {
+// ManageBatteryAndLEDs handles battery monitoring and LED management for a controller.
+func ManageBatteryAndLEDs(ctx context.Context, _ fyne.App, state *ui.AppState, path string, id int) {
 	var animCancelPlayer context.CancelFunc = func() {}
 	var animCancelRGB context.CancelFunc = func() {}
 	var animActivePlayer bool
@@ -48,7 +55,7 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 			animCancelRGB()
 			return
 		default:
-			level, err := ActualBatteryLevel(path)
+			level, err := battery.ActualBatteryLevel(path)
 			if err != nil {
 				err = state.StateText.Set("Dualsense not found")
 				if err != nil {
@@ -65,7 +72,7 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 				time.Sleep(5 * time.Second)
 				continue
 			}
-			status, err := ChargingStatus(path)
+			status, err := battery.ChargingStatus(path)
 			if err != nil {
 				continue
 			}
@@ -105,7 +112,7 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 					var animCtxPlayer context.Context
 					animCtxPlayer, animCancelPlayer = context.WithCancel(ctx)
 					animActivePlayer = true
-					go RunChargingAnimation(animCtxPlayer, path)
+					go leds.RunChargingAnimation(animCtxPlayer, path)
 				}
 
 			} else {
@@ -116,9 +123,9 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 				}
 
 				if ledPref == ui.PlayerModeBattery {
-					SetBatteryLeds(path, float64(level))
+					leds.SetBatteryLeds(path, float64(level))
 				} else {
-					SetPlayerNumber(path, id) // Mode Numéro de manette
+					leds.SetPlayerNumber(path, id) // Mode Numéro de manette
 				}
 
 			}
@@ -128,7 +135,7 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 					var animCtxRGB context.Context
 					animCtxRGB, animCancelRGB = context.WithCancel(ctx)
 					animActiveRGB = true
-					go RunRGBChargingAnimation(animCtxRGB, path, batteryChan)
+					go leds.RunRGBChargingAnimation(animCtxRGB, path, batteryChan)
 					if level != previousLevel {
 						select {
 						case batteryChan <- float64(level):
@@ -147,17 +154,17 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 
 				switch rgbPref {
 				case ui.RGBModeBattery:
-					SetBatteryColor(path, float64(level))
+					leds.SetBatteryColor(path, float64(level))
 				case ui.RGBModeStatic:
 					hexColor, err := state.LedRGBStaticColor.Get()
 					if err != nil {
 						hexColor = "0000FF"
 					}
 					r, g, b := hexToRGB(hexColor)
-					setLightbarRGB(path, r, g, b)
+					leds.SetLightbarRGB(path, r, g, b)
 
 				case ui.RGBModeOff:
-					setLightbarRGB(path, 0, 0, 0)
+					leds.SetLightbarRGB(path, 0, 0, 0)
 				}
 			}
 
@@ -165,6 +172,8 @@ func ManageBatteryAndLEDs(ctx context.Context, app fyne.App, state *ui.AppState,
 		}
 	}
 }
+
+// StartActivityLoop monitors inactivity and triggers auto-disconnect when idle.
 func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan chan time.Time, path string) {
 
 	if Debug {
@@ -246,7 +255,7 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 				}
 				mac := strings.TrimSpace(strings.TrimPrefix(macText, "MAC :"))
 				if mac != "" {
-					err := DisconnectDualSenseNative(mac)
+					err := bluetooth.DisconnectDualSenseNative(mac)
 					if err != nil {
 						log.Default().Println("Fail D-Bus:", err)
 					}
@@ -257,6 +266,7 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 
 }
 
+// StartControllerManager watches for controllers and creates UI tabs for them.
 func StartControllerManager(myApp fyne.App, conf *config.Config) *container.AppTabs {
 	if Debug {
 		log.Default().Println("StartControllerManager: Debug mode enabled")
@@ -282,7 +292,7 @@ func StartControllerManager(myApp fyne.App, conf *config.Config) *container.AppT
 
 	go func() {
 		for {
-			foundPaths, err := FindAllDualSense()
+			foundPaths, err := discovery.FindAllDualSense()
 			if err != nil {
 				log.Default().Println("Error finding DualSense controllers:", err)
 				return
@@ -297,7 +307,7 @@ func StartControllerManager(myApp fyne.App, conf *config.Config) *container.AppT
 					}
 
 					ctx, cancel := context.WithCancel(context.Background())
-					mac := ControllerMAC(path)
+					mac := bluetooth.ControllerMAC(path)
 					ctrlConf := conf.ControllerConfig(mac)
 					newTab := ui.CreateNewControllerTab(path, conf, ctrlConf, mac, id+1)
 					newTab.CancelFunc = cancel
@@ -343,6 +353,7 @@ func pathExists(path string) bool {
 	return false
 }
 
+// ShortMAC returns a short (last 5 chars) representation of the MAC address.
 func ShortMAC(fullMAC string) string {
 	if len(fullMAC) > 5 {
 		return fullMAC[len(fullMAC)-5:]

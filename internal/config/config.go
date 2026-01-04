@@ -1,3 +1,4 @@
+// Package config handles loading and saving application configuration.
 package config
 
 import (
@@ -7,6 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Config holds global application configuration.
 type Config struct {
 	IdleMinutes  int `yaml:"idle_minutes"`
 	BatteryAlert int `yaml:"battery_alert"`
@@ -14,6 +16,7 @@ type Config struct {
 	Controllers map[string]ControllerConfig `yaml:"controllers,omitempty"`
 }
 
+// ControllerConfig holds per-controller configuration overrides.
 type ControllerConfig struct {
 	Deadzone            int    `yaml:"deadzone,omitempty"`
 	LedPlayerPreference int    `yaml:"led_player,omitempty"`
@@ -63,6 +66,7 @@ func configPath() (string, error) {
 	return filepath.Join(path, "config.yaml"), nil
 }
 
+// Save writes the provided configuration to disk.
 func Save(conf *Config) error {
 	path, err := configPath()
 	if err != nil {
@@ -77,6 +81,7 @@ func Save(conf *Config) error {
 	return os.WriteFile(path, data, 0644)
 }
 
+// Load reads the configuration from disk, creating a default file if missing.
 func Load() (*Config, error) {
 	path, err := configPath()
 	if err != nil {
