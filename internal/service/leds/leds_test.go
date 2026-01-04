@@ -52,7 +52,11 @@ func (f *fakeFS) Stat(path string) (os.FileInfo, error) {
 	return nil, fmt.Errorf("not found")
 }
 
-func TestSetPlayerNumber2(t *testing.T) {
+func (f *fakeFS) ResetWrites() {
+	f.writes = nil
+}
+
+func TestSetPlayerNumber(t *testing.T) {
 	old := sysfs.FS
 	fake := &fakeFS{
 		files:  map[string][]byte{},
@@ -103,26 +107,7 @@ func TestSetPlayerNumber2(t *testing.T) {
 			t.Fatalf("led %s: want %q got %q", led, want[led], string(w.data))
 		}
 	}
-}
-
-func TestSetPlayerNumber5(t *testing.T) {
-	old := sysfs.FS
-	fake := &fakeFS{
-		files:  map[string][]byte{},
-		globs:  map[string][]string{},
-		writes: nil,
-	}
-
-	sysfs.FS = fake
-	defer func() { sysfs.FS = old }()
-	jsPath := "/dev/input/js0"
-	// prefill explicit globs so applyLed finds matching paths
-	base := "/sys/class/input/js0/device/leds"
-	fake.globs[base+"/*:player-1"] = []string{base + "/mock:player-1"}
-	fake.globs[base+"/*:player-5"] = []string{base + "/mock:player-5"}
-	fake.globs[base+"/*:player-2"] = []string{base + "/mock:player-2"}
-	fake.globs[base+"/*:player-4"] = []string{base + "/mock:player-4"}
-	fake.globs[base+"/*:player-3"] = []string{base + "/mock:player-3"}
+	fake.ResetWrites()
 
 	// expected values for id==5
 	SetPlayerNumber(jsPath, 5)
@@ -133,7 +118,7 @@ func TestSetPlayerNumber5(t *testing.T) {
 	}
 
 	// expected values for id==2
-	want := map[string]string{
+	want = map[string]string{
 		"player-1": "1",
 		"player-5": "1",
 		"player-2": "1",
@@ -197,4 +182,171 @@ func TestSetLightbarRGB(t *testing.T) {
 	if fake.writes[1].path != wantPath {
 		t.Fatalf("expected path %q got %q", wantPath, fake.writes[1].path)
 	}
+}
+
+func TestSetBatteryColor(t *testing.T) {
+	old := sysfs.FS
+	fake := &fakeFS{
+		files:  map[string][]byte{},
+		globs:  map[string][]string{},
+		writes: nil,
+	}
+
+	sysfs.FS = fake
+	defer func() { sysfs.FS = old }()
+
+	jsPath := "/dev/input/js0"
+	// prefill explicit globs so applyLed finds matching paths
+	base := "/sys/class/input/js0/device/leds"
+	fake.globs[base+"/*:battery:indicator"] = []string{base + "/mock:battery:indicator"}
+	// Call function under test
+	SetBatteryColor(jsPath, 75)
+
+	// expect 2 write
+	if len(fake.writes) != 2 {
+		t.Fatalf("expected 2 write, got %d", len(fake.writes))
+	}
+	wantData := "127 255 0"
+	if string(fake.writes[0].data) != wantData {
+		t.Fatalf("expected data %q got %q", wantData, string(fake.writes[0].data))
+	}
+	wantPath := base + "/mock:indicator/multi_intensity"
+	if fake.writes[0].path != wantPath {
+		t.Fatalf("expected path %q got %q", wantPath, fake.writes[0].path)
+	}
+
+	fake.ResetWrites()
+
+	// Call function under test
+	SetBatteryColor(jsPath, 25)
+	// expect 2 write
+	if len(fake.writes) != 2 {
+		t.Fatalf("expected 2 write, got %d", len(fake.writes))
+	}
+	wantData = "255 127 0"
+	if string(fake.writes[0].data) != wantData {
+		t.Fatalf("expected data %q got %q", wantData, string(fake.writes[0].data))
+	}
+	wantPath = base + "/mock:indicator/multi_intensity"
+	if fake.writes[0].path != wantPath {
+		t.Fatalf("expected path %q got %q", wantPath, fake.writes[0].path)
+	}
+
+	fake.ResetWrites()
+
+	// Call function under test
+	SetBatteryColor(jsPath, 50)
+	// expect 2 write
+	if len(fake.writes) != 2 {
+		t.Fatalf("expected 2 write, got %d", len(fake.writes))
+	}
+	wantData = "255 255 0"
+	if string(fake.writes[0].data) != wantData {
+		t.Fatalf("expected data %q got %q", wantData, string(fake.writes[0].data))
+	}
+	wantPath = base + "/mock:indicator/multi_intensity"
+	if fake.writes[0].path != wantPath {
+		t.Fatalf("expected path %q got %q", wantPath, fake.writes[0].path)
+	}
+
+	fake.ResetWrites()
+
+	// Call function under test
+	SetBatteryColor(jsPath, 10)
+	// expect 2 write
+	if len(fake.writes) != 2 {
+		t.Fatalf("expected 2 write, got %d", len(fake.writes))
+	}
+	wantData = "255 51 0"
+	if string(fake.writes[0].data) != wantData {
+		t.Fatalf("expected data %q got %q", wantData, string(fake.writes[0].data))
+	}
+	wantPath = base + "/mock:indicator/multi_intensity"
+	if fake.writes[0].path != wantPath {
+		t.Fatalf("expected path %q got %q", wantPath, fake.writes[0].path)
+	}
+}
+
+func TestSetBatteryLeds(t *testing.T) {
+	old := sysfs.FS
+	fake := &fakeFS{
+		files:  map[string][]byte{},
+		globs:  map[string][]string{},
+		writes: nil,
+	}
+
+	sysfs.FS = fake
+	defer func() { sysfs.FS = old }()
+	jsPath := "/dev/input/js0"
+	// prefill explicit globs so applyLed finds matching paths
+	base := "/sys/class/input/js0/device/leds"
+	fake.globs[base+"/*:player-1"] = []string{base + "/mock:player-1"}
+	fake.globs[base+"/*:player-5"] = []string{base + "/mock:player-5"}
+	fake.globs[base+"/*:player-2"] = []string{base + "/mock:player-2"}
+	fake.globs[base+"/*:player-4"] = []string{base + "/mock:player-4"}
+	fake.globs[base+"/*:player-3"] = []string{base + "/mock:player-3"}
+
+	SetBatteryLeds(jsPath, 50)
+
+	// expect 5 writes (player-1, player-5, player-2, player-4, player-3)
+	if len(fake.writes) != 5 {
+		t.Fatalf("expected 5 writes, got %d", len(fake.writes))
+	}
+
+	want := map[string]string{
+		"player-1": "0",
+		"player-5": "0",
+		"player-2": "1",
+		"player-4": "1",
+		"player-3": "1",
+	}
+
+	for _, w := range fake.writes {
+		var led string
+		for k := range want {
+			if strings.Contains(w.path, ":"+k+"/brightness") || strings.Contains(w.path, ":"+k) {
+				led = k
+				break
+			}
+		}
+		if led == "" {
+			t.Fatalf("write to unexpected path: %s", w.path)
+		}
+		if string(w.data) != want[led] {
+			t.Fatalf("led %s: want %q got %q", led, want[led], string(w.data))
+		}
+	}
+
+	fake.ResetWrites()
+
+	SetBatteryLeds(jsPath, 100)
+	// expect 5 writes (player-1, player-5, player-2, player-4, player-3)
+	if len(fake.writes) != 5 {
+		t.Fatalf("expected 5 writes, got %d", len(fake.writes))
+	}
+
+	want = map[string]string{
+		"player-1": "1",
+		"player-5": "1",
+		"player-2": "1",
+		"player-4": "1",
+		"player-3": "1",
+	}
+
+	for _, w := range fake.writes {
+		var led string
+		for k := range want {
+			if strings.Contains(w.path, ":"+k+"/brightness") || strings.Contains(w.path, ":"+k) {
+				led = k
+				break
+			}
+		}
+		if led == "" {
+			t.Fatalf("write to unexpected path: %s", w.path)
+		}
+		if string(w.data) != want[led] {
+			t.Fatalf("led %s: want %q got %q", led, want[led], string(w.data))
+		}
+	}
+
 }
