@@ -28,9 +28,9 @@ func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.C
 	state := &AppState{
 		ControllerID:        binding.NewInt(),
 		BatteryValue:        binding.NewFloat(),
-		StateText:           binding.NewString(),
+		State:               binding.NewString(),
 		LastActivityBinding: binding.NewString(),
-		MacText:             binding.NewString(),
+		Mac:                 binding.NewString(),
 		SelectedDuration:    binding.NewString(),
 		DeadzoneValue:       binding.NewFloat(),
 		LedPlayerPreference: binding.NewInt(),
@@ -54,7 +54,7 @@ func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.C
 	if err != nil {
 		fmt.Println("Error setting LED player preference:", err)
 	}
-	err = state.MacText.Set("MAC : " + macAddress)
+	err = state.Mac.Set(macAddress)
 	if err != nil {
 		fmt.Println("Error setting MAC text:", err)
 	}

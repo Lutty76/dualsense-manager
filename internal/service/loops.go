@@ -56,7 +56,7 @@ func ManageBatteryAndLEDs(ctx context.Context, _ fyne.App, state *ui.AppState, p
 		default:
 			level, err := battery.ActualBatteryLevel(path)
 			if err != nil {
-				err = state.StateText.Set("Dualsense not found")
+				err = state.State.Set("Dualsense not found")
 				if err != nil {
 					log.Default().Println("Error setting state text:", err)
 				}
@@ -77,7 +77,7 @@ func ManageBatteryAndLEDs(ctx context.Context, _ fyne.App, state *ui.AppState, p
 			if err != nil {
 				log.Default().Println("Error setting battery value:", err)
 			}
-			err = state.StateText.Set("State : " + status)
+			err = state.State.Set(status)
 			if err != nil {
 				log.Default().Println("Error setting state text:", err)
 			}
@@ -185,7 +185,7 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 				log.Default().Println("Error setting last activity binding:", err)
 			}
 		case <-ticker.C:
-			status, err := state.StateText.Get()
+			status, err := state.State.Get()
 			if err != nil {
 				continue
 			}
@@ -238,11 +238,10 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 			if diff > limit {
 				log.Default().Println("Auto disconnect !")
 				// prefer cached MAC from UI state to avoid repeated sysfs reads
-				macText, err := state.MacText.Get()
+				mac, err := state.Mac.Get()
 				if err != nil {
 					continue
 				}
-				mac := strings.TrimSpace(strings.TrimPrefix(macText, "MAC :"))
 				if mac != "" {
 					err := bluetooth.DisconnectDualSenseNative(mac)
 					if err != nil {
