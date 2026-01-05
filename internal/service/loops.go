@@ -87,7 +87,7 @@ func ManageBatteryAndLEDs(ctx context.Context, _ fyne.App, state *ui.ControllerS
 				default:
 				}
 
-				if level < state.GlobalState.BatteryAlert && state.GlobalState.BatteryAlert != 0 {
+				if level <= state.GlobalState.BatteryAlert && state.GlobalState.BatteryAlert != 0 {
 					log.Default().Printf("Battery low (%d%%) for controller at path: %s\n", level, path)
 					fyne.CurrentApp().SendNotification(&fyne.Notification{
 						Title:   "DualSense Battery Low",

@@ -10,8 +10,10 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -68,13 +70,17 @@ func main() {
 
 	selectBatteryWidget := ui.CreateBatteryWidget(globalState, conf)
 	selectDelayWidget := ui.CreateDelayIdleSelect(globalState, conf)
-	appContainer := container.NewVBox(
-		controllerTabs,
-		widget.NewSeparator(),
-		widget.NewSeparator(),
+
+	thickSeparator := canvas.NewRectangle(theme.Color(theme.ColorNameShadow))
+	thickSeparator.SetMinSize(fyne.NewSize(0, 3))
+
+	bottomControls := container.NewVBox(
+		thickSeparator,
 		container.NewBorder(nil, nil, widget.NewLabel("Battery alert :"), nil, selectBatteryWidget),
 		container.NewBorder(nil, nil, widget.NewLabel("Delay :"), nil, selectDelayWidget),
 	)
+
+	appContainer := container.NewBorder(nil, bottomControls, nil, nil, container.NewStack(controllerTabs))
 
 	myWindow.SetContent(appContainer)
 	myWindow.Resize(fyne.NewSize(300, 550))
