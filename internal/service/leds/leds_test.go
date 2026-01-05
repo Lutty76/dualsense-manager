@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 type writeRec struct {
@@ -331,6 +332,87 @@ func TestSetBatteryLeds(t *testing.T) {
 		"player-2": "1",
 		"player-4": "1",
 		"player-3": "1",
+	}
+
+	for _, w := range fake.writes {
+		var led string
+		for k := range want {
+			if strings.Contains(w.path, ":"+k+"/brightness") || strings.Contains(w.path, ":"+k) {
+				led = k
+				break
+			}
+		}
+		if led == "" {
+			t.Fatalf("write to unexpected path: %s", w.path)
+		}
+		if string(w.data) != want[led] {
+			t.Fatalf("led %s: want %q got %q", led, want[led], string(w.data))
+		}
+	}
+
+	fake.ResetWrites()
+	SetBatteryLeds(jsPath, 15)
+	// expect 5 writes (player-1, player-5, player-2, player-4, player-3)
+	if len(fake.writes) != 5 {
+		t.Fatalf("expected 5 writes, got %d", len(fake.writes))
+	}
+	if time.Now().Unix()%2 == 0 {
+		want = map[string]string{
+			"player-1": "0",
+			"player-5": "0",
+			"player-2": "1",
+			"player-4": "1",
+			"player-3": "0",
+		}
+	} else {
+		want = map[string]string{
+			"player-1": "0",
+			"player-5": "0",
+			"player-2": "0",
+			"player-4": "0",
+			"player-3": "0",
+		}
+	}
+
+	for _, w := range fake.writes {
+		var led string
+		for k := range want {
+			if strings.Contains(w.path, ":"+k+"/brightness") || strings.Contains(w.path, ":"+k) {
+				led = k
+				break
+			}
+		}
+		if led == "" {
+			t.Fatalf("write to unexpected path: %s", w.path)
+		}
+		if string(w.data) != want[led] {
+			t.Fatalf("led %s: want %q got %q", led, want[led], string(w.data))
+		}
+	}
+
+	fake.ResetWrites()
+	SetBatteryLeds(jsPath, 5)
+	// expect 5 writes (player-1, player-5, player-2, player-4, player-3)
+	if len(fake.writes) != 5 {
+		t.Fatalf("expected 5 writes, got %d", len(fake.writes))
+	}
+
+	if time.Now().Unix()%2 == 0 {
+		want = map[string]string{
+			"player-1": "0",
+			"player-5": "0",
+			"player-2": "0",
+			"player-4": "0",
+			"player-3": "1",
+		}
+	} else {
+		want = map[string]string{
+			"player-1": "0",
+			"player-5": "0",
+			"player-2": "0",
+			"player-4": "0",
+			"player-3": "0",
+		}
 	}
 
 	for _, w := range fake.writes {
