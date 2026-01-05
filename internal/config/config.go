@@ -2,6 +2,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 
@@ -55,7 +56,22 @@ func (c *Config) ControllerConfig(mac string) *ControllerConfig {
 
 	return res
 }
+func SaveControllerConfig(mac string, conf *Config, update func(*ControllerConfig)) {
 
+	if mac == "" {
+		return
+	}
+	if conf.Controllers == nil {
+		conf.Controllers = map[string]ControllerConfig{}
+	}
+	cc := conf.Controllers[mac]
+	update(&cc)
+	conf.Controllers[mac] = cc
+	err := Save(conf)
+	if err != nil {
+		log.Default().Println("Error saving controller config for", mac, ":", err)
+	}
+}
 func configPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

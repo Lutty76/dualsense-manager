@@ -23,9 +23,9 @@ import (
 type AppState struct {
 	ControllerID        binding.Int
 	BatteryValue        binding.Float
-	StateText           binding.String
+	State               binding.String
 	LastActivityBinding binding.String
-	MacText             binding.String
+	Mac                 binding.String
 	SelectedDuration    binding.String
 	DeadzoneValue       binding.Float
 	LedPlayerPreference binding.Int
@@ -56,86 +56,75 @@ var rgbOptions = map[int]string{
 
 // CreateContent builds the controller UI content for a tab.
 func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state *AppState) fyne.CanvasObject {
-	options := []string{"1 min", "2 min", "5 min", "10 min", "20 min", "30 min", "40 min", "Never"}
-	optionsBattery := []string{"5 %", "15 %", "25 %", "Never"}
 
-	macText, err := state.MacText.Get()
+	mac, err := state.Mac.Get()
 	if err != nil {
-		macText = ""
-	}
-	mac := strings.TrimSpace(strings.TrimPrefix(macText, "MAC :"))
-
-	// helper to update per-controller config and persist changes
-	saveCtrl := func(mac string, update func(*config.ControllerConfig)) {
-		if mac == "" {
-			return
-		}
-		if conf.Controllers == nil {
-			conf.Controllers = map[string]config.ControllerConfig{}
-		}
-		cc := conf.Controllers[mac]
-		update(&cc)
-		conf.Controllers[mac] = cc
-		err := config.Save(conf)
-		if err != nil {
-			log.Default().Println("Error saving controller config for", mac, ":", err)
-		}
+		mac = ""
 	}
 
-	selectDelayWidget := widget.NewSelect(options, func(value string) {
-		err = state.SelectedDuration.Set(value)
-		if err != nil {
-			log.Default().Println("Error setting selected duration:", err)
-		}
-		if value == "Never" {
-			conf.IdleMinutes = 0
-		} else {
-			minutes, err := strconv.Atoi(strings.Split(value, " ")[0])
-			if err != nil {
-				log.Default().Printf("Unable to parse delay : %s", value)
-				return
-			}
-			conf.IdleMinutes = minutes
-		}
+	controllerID, err := state.ControllerID.Get()
+	if err != nil {
+		log.Default().Println("Error getting controller ID:", err)
+		controllerID = 0
+	}
 
-		err := config.Save(conf)
-		if err != nil {
-			log.Default().Println("Error saving controller config for", mac, ":", err)
-		}
-	})
+	selectBatteryWidget := createBatteryWidget(conf)
+	deadzoneLabel, deadzoneSlider := createDeadzoneInput(state, mac, conf, ctrlConf)
+	ledSelect := createPlayerLedSelect(state, mac, conf)
+	rgbSelect := createRgbLedSelect(state, ctrlConf)
+	selectDelayWidget := createDelayIdleSelect(state, conf)
+	staticColorContainer := createStaticColorContainer(state, mac, conf)
 
-	// initialize selection from global config
-	if conf.IdleMinutes == 0 {
-		selectDelayWidget.SetSelected("Never")
+	currentIDRGB, err := state.LedRGBPreference.Get()
+	if err != nil {
+		currentIDRGB = RGBModeBattery
+	}
+	if currentIDRGB == RGBModeStatic {
+		staticColorContainer.Show()
 	} else {
-		selectDelayWidget.SetSelected(fmt.Sprintf("%d min", conf.IdleMinutes))
+		staticColorContainer.Hide()
 	}
 
-	selectBatteryWidget := widget.NewSelect(optionsBattery, func(value string) {
-		if value == "Never" {
-			conf.BatteryAlert = 0
-		} else {
-			percent, err := strconv.Atoi(strings.Split(value, " ")[0])
-			if err != nil {
-				log.Default().Printf("Unable to parse battery alert : %s", value)
-				return
+	// ensure rgbSelect shows or hides the static-color entry when changed
+	rgbSelect.OnChanged = func(selected string) {
+		for id, name := range rgbOptions {
+			if name == selected {
+				err = state.LedRGBPreference.Set(id)
+				if err != nil {
+					log.Default().Println("Error setting LED RGB preference:", err)
+				}
+				if mac != "" {
+					config.SaveControllerConfig(mac, conf, func(cc *config.ControllerConfig) { cc.LedRGBPreference = id })
+				}
+				if id == RGBModeStatic {
+					staticColorContainer.Show()
+				} else {
+					staticColorContainer.Hide()
+				}
+				break
 			}
-			conf.BatteryAlert = percent
 		}
-
-		err := config.Save(conf)
-		if err != nil {
-			log.Default().Println("Error saving controller config for", mac, ":", err)
-		}
-	})
-
-	// initialize selection from global config
-	if conf.BatteryAlert == 0 {
-		selectBatteryWidget.SetSelected("Never")
-	} else {
-		selectBatteryWidget.SetSelected(fmt.Sprintf("%d %%", conf.BatteryAlert))
 	}
+	return container.NewVBox(
+		widget.NewLabel("Controller n°"+strconv.Itoa(controllerID)),
+		widget.NewLabel("Battery :"),
+		widget.NewProgressBarWithData(state.BatteryValue),
+		container.NewHBox(widget.NewLabel("State :"), widget.NewLabelWithData(state.State)),
+		widget.NewLabel(fmt.Sprintf("MAC : %s", mac)),
+		container.NewBorder(nil, nil, widget.NewLabel("Player LED :"), nil, ledSelect),
+		container.NewBorder(nil, nil, widget.NewLabel("RGB LED :"), nil, rgbSelect),
+		staticColorContainer,
+		deadzoneLabel,
+		deadzoneSlider,
+		widget.NewSeparator(),
+		widget.NewSeparator(),
+		container.NewBorder(nil, nil, widget.NewLabel("Battery alert :"), nil, selectBatteryWidget),
+		container.NewBorder(nil, nil, widget.NewLabel("Delay :"), nil, selectDelayWidget),
+		widget.NewLabelWithData(state.LastActivityBinding),
+	)
+}
 
+func createDeadzoneInput(state *AppState, mac string, conf *config.Config, ctrlConf *config.ControllerConfig) (*widget.Label, *widget.Slider) {
 	deadzoneSlider := widget.NewSliderWithData(0, 10000, state.DeadzoneValue)
 	deadzoneSlider.Step = 250
 	// initialize deadzone label from per-controller config when available,
@@ -154,31 +143,48 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 		deadzoneLabel.SetText(fmt.Sprintf("Deadzone : %d", val))
 		// save per-controller if mac known
 		if mac != "" {
-			err = state.DeadzoneValue.Set(v)
+			err := state.DeadzoneValue.Set(v)
 			if err != nil {
 				log.Default().Println("Error setting deadzone value:", err)
 			}
 
-			saveCtrl(mac, func(cc *config.ControllerConfig) { cc.Deadzone = val })
+			config.SaveControllerConfig(mac, conf, func(cc *config.ControllerConfig) { cc.Deadzone = val })
 		}
 	}
+
+	return deadzoneLabel, deadzoneSlider
+
+}
+
+func createPlayerLedSelect(state *AppState, mac string, conf *config.Config) *widget.Select {
 
 	names := []string{playerOptions[0], playerOptions[1]}
 
 	ledSelect := widget.NewSelect(names, func(selected string) {
 		for id, name := range playerOptions {
 			if name == selected {
-				err = state.LedPlayerPreference.Set(id)
+				err := state.LedPlayerPreference.Set(id)
 				if err != nil {
 					log.Default().Println("Error setting LED player preference:", err)
 				}
 				if mac != "" {
-					saveCtrl(mac, func(cc *config.ControllerConfig) { cc.LedPlayerPreference = id })
+					config.SaveControllerConfig(mac, conf, func(cc *config.ControllerConfig) { cc.LedPlayerPreference = id })
 				}
 				break
 			}
 		}
 	})
+
+	currentID, err := state.LedPlayerPreference.Get()
+	if err != nil {
+		currentID = PlayerModeNumber
+	}
+	ledSelect.SetSelected(playerOptions[currentID])
+
+	return ledSelect
+}
+
+func createRgbLedSelect(state *AppState, ctrlConf *config.ControllerConfig) *widget.Select {
 
 	namesRgb := []string{rgbOptions[0], rgbOptions[1], rgbOptions[2]}
 
@@ -196,16 +202,53 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 			}
 		}
 	}
-	currentID, err := state.LedPlayerPreference.Get()
-	if err != nil {
-		currentID = PlayerModeNumber
-	}
-	ledSelect.SetSelected(playerOptions[currentID])
+
 	currentIDRGB, err := state.LedRGBPreference.Get()
 	if err != nil {
 		currentIDRGB = RGBModeBattery
 	}
 	rgbSelect.SetSelected(rgbOptions[currentIDRGB])
+
+	return rgbSelect
+
+}
+
+func createDelayIdleSelect(state *AppState, conf *config.Config) fyne.CanvasObject {
+	options := []string{"1 min", "2 min", "5 min", "10 min", "20 min", "30 min", "40 min", "Never"}
+
+	selectDelayWidget := widget.NewSelect(options, func(value string) {
+		err := state.SelectedDuration.Set(value)
+		if err != nil {
+			log.Default().Println("Error setting selected duration:", err)
+		}
+		if value == "Never" {
+			conf.IdleMinutes = 0
+		} else {
+			minutes, err := strconv.Atoi(strings.Split(value, " ")[0])
+			if err != nil {
+				log.Default().Printf("Unable to parse delay : %s", value)
+				return
+			}
+			conf.IdleMinutes = minutes
+		}
+
+		err = config.Save(conf)
+		if err != nil {
+			log.Default().Println("Error saving controller config :", err)
+		}
+	})
+
+	// initialize selection from global config
+	if conf.IdleMinutes == 0 {
+		selectDelayWidget.SetSelected("Never")
+	} else {
+		selectDelayWidget.SetSelected(fmt.Sprintf("%d min", conf.IdleMinutes))
+	}
+
+	return selectDelayWidget
+}
+
+func createStaticColorContainer(state *AppState, mac string, conf *config.Config) *fyne.Container {
 
 	staticColorEntry := widget.NewEntryWithData(state.LedRGBStaticColor)
 	staticColorEntry.SetPlaceHolder("FFFFFF")
@@ -249,59 +292,41 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 			if mac == "" {
 				return
 			}
-			saveCtrl(mac, func(cc *config.ControllerConfig) { cc.LedRGBStatic = "#" + val })
+			config.SaveControllerConfig(mac, conf, func(cc *config.ControllerConfig) { cc.LedRGBStatic = "#" + val })
 		})
 	}
 	staticColorContainer := container.NewBorder(nil, nil, widget.NewLabel("Static Color Hex (RRGGBB): "), nil, container.NewVBox(staticColorEntry, validationLabel))
 
-	if currentIDRGB == RGBModeStatic {
-		staticColorContainer.Show()
-	} else {
-		staticColorContainer.Hide()
-	}
+	return staticColorContainer
+}
 
-	// ensure rgbSelect shows or hides the static-color entry when changed
-	rgbSelect.OnChanged = func(selected string) {
-		for id, name := range rgbOptions {
-			if name == selected {
-				err = state.LedRGBPreference.Set(id)
-				if err != nil {
-					log.Default().Println("Error setting LED RGB preference:", err)
-				}
-				if mac != "" {
-					saveCtrl(mac, func(cc *config.ControllerConfig) { cc.LedRGBPreference = id })
-				}
-				if id == RGBModeStatic {
-					staticColorContainer.Show()
-				} else {
-					staticColorContainer.Hide()
-				}
-				break
+func createBatteryWidget(conf *config.Config) *widget.Select {
+	optionsBattery := []string{"5 %", "15 %", "25 %", "Never"}
+
+	selectBatteryWidget := widget.NewSelect(optionsBattery, func(value string) {
+		if value == "Never" {
+			conf.BatteryAlert = 0
+		} else {
+			percent, err := strconv.Atoi(strings.Split(value, " ")[0])
+			if err != nil {
+				log.Default().Printf("Unable to parse battery alert : %s", value)
+				return
 			}
+			conf.BatteryAlert = percent
 		}
-	}
 
-	controllerID, err := state.ControllerID.Get()
-	if err != nil {
-		log.Default().Println("Error getting controller ID:", err)
-		controllerID = 0
-	}
+		err := config.Save(conf)
+		if err != nil {
+			log.Default().Println("Error saving controller config for :", err)
+		}
+	})
 
-	return container.NewVBox(
-		widget.NewLabel("Controller n°"+strconv.Itoa(controllerID)),
-		widget.NewLabel("Battery :"),
-		widget.NewProgressBarWithData(state.BatteryValue),
-		widget.NewLabelWithData(state.StateText),
-		widget.NewLabelWithData(state.MacText),
-		container.NewBorder(nil, nil, widget.NewLabel("Player LED :"), nil, ledSelect),
-		container.NewBorder(nil, nil, widget.NewLabel("RGB LED :"), nil, rgbSelect),
-		staticColorContainer,
-		deadzoneLabel,
-		deadzoneSlider,
-		widget.NewSeparator(),
-		widget.NewSeparator(),
-		container.NewBorder(nil, nil, widget.NewLabel("Battery alert :"), nil, selectBatteryWidget),
-		container.NewBorder(nil, nil, widget.NewLabel("Delay :"), nil, selectDelayWidget),
-		widget.NewLabelWithData(state.LastActivityBinding),
-	)
+	// initialize selection from global config
+	if conf.BatteryAlert == 0 {
+		selectBatteryWidget.SetSelected("Never")
+	} else {
+		selectBatteryWidget.SetSelected(fmt.Sprintf("%d %%", conf.BatteryAlert))
+	}
+	return selectBatteryWidget
+
 }
