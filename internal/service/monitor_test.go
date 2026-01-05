@@ -47,7 +47,7 @@ func TestMonitorJoystickReceivesActivity(t *testing.T) {
 	fyApp := app.New()
 	defer fyApp.Quit()
 
-	state := &ui.AppState{
+	state := &ui.ControllerState{
 		DeadzoneValue: binding.NewFloat(),
 	}
 	// set low deadzone to ensure axis event counts

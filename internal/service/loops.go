@@ -27,7 +27,7 @@ var (
 )
 
 // ManageBatteryAndLEDs handles battery monitoring and LED management for a controller.
-func ManageBatteryAndLEDs(ctx context.Context, _ fyne.App, state *ui.AppState, path string, id int) {
+func ManageBatteryAndLEDs(ctx context.Context, _ fyne.App, state *ui.ControllerState, path string, id int) {
 	var animCancelPlayer context.CancelFunc = func() {}
 	var animCancelRGB context.CancelFunc = func() {}
 	var animActivePlayer bool
@@ -84,9 +84,17 @@ func ManageBatteryAndLEDs(ctx context.Context, _ fyne.App, state *ui.AppState, p
 			if level != previousLevel {
 				select {
 				case batteryChan <- float64(level):
-					previousLevel = level
 				default:
 				}
+
+				if level < state.GlobalState.BatteryAlert && state.GlobalState.BatteryAlert != 0 {
+					log.Default().Printf("Battery low (%d%%) for controller at path: %s\n", level, path)
+					fyne.CurrentApp().SendNotification(&fyne.Notification{
+						Title:   "DualSense Battery Low",
+						Content: fmt.Sprintf("Controller %d battery is at %d%%", id, level),
+					})
+				}
+				previousLevel = level
 			}
 			ledPref, err := state.LedPlayerPreference.Get()
 			if err != nil {
@@ -163,7 +171,7 @@ func ManageBatteryAndLEDs(ctx context.Context, _ fyne.App, state *ui.AppState, p
 }
 
 // StartActivityLoop monitors inactivity and triggers auto-disconnect when idle.
-func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan chan time.Time, path string) {
+func StartActivityLoop(ctx context.Context, state *ui.ControllerState, activityChan chan time.Time, path string) {
 
 	if Debug {
 		log.Default().Println("Starting activity loop for controller at path:", path)
@@ -200,16 +208,9 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 			}
 			diff := time.Since(lastActivityTime)
 
-			currentChoice, err := state.SelectedDuration.Get()
-			if err != nil {
-				continue
-			}
+			currentChoice := state.GlobalState.DelayIdleMinutes
 
-			if currentChoice == "" {
-				continue
-			}
-
-			if currentChoice == "Jamais" {
+			if currentChoice == 0 {
 				err = state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s (Auto-off Disabled)", diff.Truncate(time.Second)))
 				if err != nil {
 					log.Default().Println("Error setting last activity binding:", err)
@@ -224,14 +225,8 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 				continue
 			}
 
-			parts := strings.Split(currentChoice, " ")
-			minutes, err := strconv.Atoi(parts[0])
-			if err != nil || minutes <= 0 {
-				continue
-			}
-
-			limit := time.Duration(minutes) * time.Minute
-			err = state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s / %s", diff.Truncate(time.Second), currentChoice))
+			limit := time.Duration(currentChoice) * time.Minute
+			err = state.LastActivityBinding.Set(fmt.Sprintf("Inactive : %s / %d min", diff.Truncate(time.Second), currentChoice))
 			if err != nil {
 				log.Default().Println("Error setting last activity binding:", err)
 			}
@@ -254,7 +249,7 @@ func StartActivityLoop(ctx context.Context, state *ui.AppState, activityChan cha
 }
 
 // StartControllerManager watches for controllers and creates UI tabs for them.
-func StartControllerManager(myApp fyne.App, conf *config.Config) *container.AppTabs {
+func StartControllerManager(myApp fyne.App, globalState *ui.GlobalState, conf *config.Config) *container.AppTabs {
 	if Debug {
 		log.Default().Println("StartControllerManager: Debug mode enabled")
 	}
@@ -296,7 +291,7 @@ func StartControllerManager(myApp fyne.App, conf *config.Config) *container.AppT
 					ctx, cancel := context.WithCancel(context.Background())
 					mac := bluetooth.ControllerMAC(path)
 					ctrlConf := conf.ControllerConfig(mac)
-					newTab := ui.CreateNewControllerTab(path, conf, ctrlConf, mac, id+1)
+					newTab := ui.CreateNewControllerTab(globalState, path, conf, ctrlConf, mac, id+1)
 					newTab.CancelFunc = cancel
 					activeControllers[path] = newTab
 
