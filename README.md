@@ -2,6 +2,7 @@ DualSense Manager
 =================
 
 [![Build Status](https://github.com/Lutty76/dualsense-manager/actions/workflows/go.yml/badge.svg)](https://github.com/Lutty76/dualsense-manager/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Lutty76/dualsense-manager)](https://goreportcard.com/report/github.com/Lutty76/dualsense-manager)
 
 A small desktop utility to monitor and manage DualSense controllers on Linux. It displays battery level, charging state, controller MAC, controls LEDs/RGB behaviors and auto turn off when idle. Built with Go and the Fyne GUI toolkit.
 
