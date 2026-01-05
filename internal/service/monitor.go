@@ -16,7 +16,7 @@ var OpenJoystick = func(path string) (io.ReadCloser, error) {
 }
 
 // MonitorJoystick reads joystick events and notifies activity via activityChan.
-func MonitorJoystick(path string, activityChan chan time.Time, state *ui.AppState) {
+func MonitorJoystick(path string, activityChan chan time.Time, state *ui.ControllerState) {
 	if Debug {
 		log.Default().Println("Starting joystick monitor for controller at path:", path)
 	}

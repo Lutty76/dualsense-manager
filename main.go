@@ -4,12 +4,15 @@ package main
 import (
 	"dualsense/internal/config"
 	"dualsense/internal/service"
+	"dualsense/internal/ui"
 	"flag"
 	"log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/widget"
 )
 
 var Version = "dev"
@@ -55,10 +58,26 @@ func main() {
 	})
 
 	service.Debug = *debugPtr
-	controllerTabs := service.StartControllerManager(myApp, conf)
 
-	myWindow.SetContent(controllerTabs)
-	myWindow.Resize(fyne.NewSize(300, 300))
+	globalState := &ui.GlobalState{
+		DelayIdleMinutes: conf.IdleMinutes,
+		BatteryAlert:     conf.BatteryAlert,
+	}
+
+	controllerTabs := service.StartControllerManager(myApp, globalState, conf)
+
+	selectBatteryWidget := ui.CreateBatteryWidget(globalState, conf)
+	selectDelayWidget := ui.CreateDelayIdleSelect(globalState, conf)
+	appContainer := container.NewVBox(
+		controllerTabs,
+		widget.NewSeparator(),
+		widget.NewSeparator(),
+		container.NewBorder(nil, nil, widget.NewLabel("Battery alert :"), nil, selectBatteryWidget),
+		container.NewBorder(nil, nil, widget.NewLabel("Delay :"), nil, selectDelayWidget),
+	)
+
+	myWindow.SetContent(appContainer)
+	myWindow.Resize(fyne.NewSize(300, 550))
 
 	if *hidePtr {
 		// start the application hidden: run app loop without showing the window

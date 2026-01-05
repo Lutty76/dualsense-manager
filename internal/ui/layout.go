@@ -19,18 +19,24 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// AppState contains data bindings representing a controller UI state.
-type AppState struct {
+// GlobalState contains application-wide settings used by controller tabs.
+type GlobalState struct {
+	DelayIdleMinutes int
+	BatteryAlert     int
+}
+
+// ControllerState contains data bindings representing a controller UI state and configuration.
+type ControllerState struct {
 	ControllerID        binding.Int
 	BatteryValue        binding.Float
 	State               binding.String
 	LastActivityBinding binding.String
 	Mac                 binding.String
-	SelectedDuration    binding.String
 	DeadzoneValue       binding.Float
 	LedPlayerPreference binding.Int
 	LedRGBPreference    binding.Int
 	LedRGBStaticColor   binding.String
+	GlobalState         *GlobalState
 }
 
 // Player and RGB modes used in UI selections.
@@ -55,7 +61,7 @@ var rgbOptions = map[int]string{
 }
 
 // CreateContent builds the controller UI content for a tab.
-func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state *AppState) fyne.CanvasObject {
+func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state *ControllerState) fyne.CanvasObject {
 
 	mac, err := state.Mac.Get()
 	if err != nil {
@@ -68,11 +74,9 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 		controllerID = 0
 	}
 
-	selectBatteryWidget := createBatteryWidget(conf)
 	deadzoneLabel, deadzoneSlider := createDeadzoneInput(state, mac, conf, ctrlConf)
 	ledSelect := createPlayerLedSelect(state, mac, conf)
 	rgbSelect := createRgbLedSelect(state, ctrlConf)
-	selectDelayWidget := createDelayIdleSelect(state, conf)
 	staticColorContainer := createStaticColorContainer(state, mac, conf)
 
 	currentIDRGB, err := state.LedRGBPreference.Get()
@@ -116,15 +120,11 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 		staticColorContainer,
 		deadzoneLabel,
 		deadzoneSlider,
-		widget.NewSeparator(),
-		widget.NewSeparator(),
-		container.NewBorder(nil, nil, widget.NewLabel("Battery alert :"), nil, selectBatteryWidget),
-		container.NewBorder(nil, nil, widget.NewLabel("Delay :"), nil, selectDelayWidget),
 		widget.NewLabelWithData(state.LastActivityBinding),
 	)
 }
 
-func createDeadzoneInput(state *AppState, mac string, conf *config.Config, ctrlConf *config.ControllerConfig) (*widget.Label, *widget.Slider) {
+func createDeadzoneInput(state *ControllerState, mac string, conf *config.Config, ctrlConf *config.ControllerConfig) (*widget.Label, *widget.Slider) {
 	deadzoneSlider := widget.NewSliderWithData(0, 10000, state.DeadzoneValue)
 	deadzoneSlider.Step = 250
 	// initialize deadzone label from per-controller config when available,
@@ -156,7 +156,7 @@ func createDeadzoneInput(state *AppState, mac string, conf *config.Config, ctrlC
 
 }
 
-func createPlayerLedSelect(state *AppState, mac string, conf *config.Config) *widget.Select {
+func createPlayerLedSelect(state *ControllerState, mac string, conf *config.Config) *widget.Select {
 
 	names := []string{playerOptions[0], playerOptions[1]}
 
@@ -184,7 +184,7 @@ func createPlayerLedSelect(state *AppState, mac string, conf *config.Config) *wi
 	return ledSelect
 }
 
-func createRgbLedSelect(state *AppState, ctrlConf *config.ControllerConfig) *widget.Select {
+func createRgbLedSelect(state *ControllerState, ctrlConf *config.ControllerConfig) *widget.Select {
 
 	namesRgb := []string{rgbOptions[0], rgbOptions[1], rgbOptions[2]}
 
@@ -213,42 +213,7 @@ func createRgbLedSelect(state *AppState, ctrlConf *config.ControllerConfig) *wid
 
 }
 
-func createDelayIdleSelect(state *AppState, conf *config.Config) fyne.CanvasObject {
-	options := []string{"1 min", "2 min", "5 min", "10 min", "20 min", "30 min", "40 min", "Never"}
-
-	selectDelayWidget := widget.NewSelect(options, func(value string) {
-		err := state.SelectedDuration.Set(value)
-		if err != nil {
-			log.Default().Println("Error setting selected duration:", err)
-		}
-		if value == "Never" {
-			conf.IdleMinutes = 0
-		} else {
-			minutes, err := strconv.Atoi(strings.Split(value, " ")[0])
-			if err != nil {
-				log.Default().Printf("Unable to parse delay : %s", value)
-				return
-			}
-			conf.IdleMinutes = minutes
-		}
-
-		err = config.Save(conf)
-		if err != nil {
-			log.Default().Println("Error saving controller config :", err)
-		}
-	})
-
-	// initialize selection from global config
-	if conf.IdleMinutes == 0 {
-		selectDelayWidget.SetSelected("Never")
-	} else {
-		selectDelayWidget.SetSelected(fmt.Sprintf("%d min", conf.IdleMinutes))
-	}
-
-	return selectDelayWidget
-}
-
-func createStaticColorContainer(state *AppState, mac string, conf *config.Config) *fyne.Container {
+func createStaticColorContainer(state *ControllerState, mac string, conf *config.Config) *fyne.Container {
 
 	staticColorEntry := widget.NewEntryWithData(state.LedRGBStaticColor)
 	staticColorEntry.SetPlaceHolder("FFFFFF")
@@ -300,7 +265,7 @@ func createStaticColorContainer(state *AppState, mac string, conf *config.Config
 	return staticColorContainer
 }
 
-func createBatteryWidget(conf *config.Config) *widget.Select {
+func CreateBatteryWidget(globalState *GlobalState, conf *config.Config) *widget.Select {
 	optionsBattery := []string{"5 %", "15 %", "25 %", "Never"}
 
 	selectBatteryWidget := widget.NewSelect(optionsBattery, func(value string) {
@@ -314,7 +279,7 @@ func createBatteryWidget(conf *config.Config) *widget.Select {
 			}
 			conf.BatteryAlert = percent
 		}
-
+		globalState.BatteryAlert = conf.BatteryAlert
 		err := config.Save(conf)
 		if err != nil {
 			log.Default().Println("Error saving controller config for :", err)
@@ -329,4 +294,36 @@ func createBatteryWidget(conf *config.Config) *widget.Select {
 	}
 	return selectBatteryWidget
 
+}
+
+func CreateDelayIdleSelect(globalState *GlobalState, conf *config.Config) fyne.CanvasObject {
+	options := []string{"1 min", "2 min", "5 min", "10 min", "20 min", "30 min", "40 min", "Never"}
+
+	selectDelayWidget := widget.NewSelect(options, func(value string) {
+
+		if value == "Never" {
+			conf.IdleMinutes = 0
+		} else {
+			minutes, err := strconv.Atoi(strings.Split(value, " ")[0])
+			if err != nil {
+				log.Default().Printf("Unable to parse delay : %s", value)
+				return
+			}
+			conf.IdleMinutes = minutes
+		}
+		globalState.DelayIdleMinutes = conf.IdleMinutes
+		err := config.Save(conf)
+		if err != nil {
+			log.Default().Println("Error saving controller config :", err)
+		}
+	})
+
+	// initialize selection from global config
+	if conf.IdleMinutes == 0 {
+		selectDelayWidget.SetSelected("Never")
+	} else {
+		selectDelayWidget.SetSelected(fmt.Sprintf("%d min", conf.IdleMinutes))
+	}
+
+	return selectDelayWidget
 }

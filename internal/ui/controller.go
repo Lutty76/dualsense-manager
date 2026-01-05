@@ -16,7 +16,7 @@ import (
 // ControllerTab represents a UI tab for a single controller.
 type ControllerTab struct {
 	Path         string
-	State        *AppState
+	State        *ControllerState
 	ActivityChan chan time.Time
 	Container    *fyne.Container
 	CancelFunc   context.CancelFunc
@@ -24,18 +24,18 @@ type ControllerTab struct {
 }
 
 // CreateNewControllerTab builds a `ControllerTab` with bindings and UI widgets.
-func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.ControllerConfig, macAddress string, id int) *ControllerTab {
-	state := &AppState{
+func CreateNewControllerTab(globalState *GlobalState, path string, conf *config.Config, ctrlConf *config.ControllerConfig, macAddress string, id int) *ControllerTab {
+	state := &ControllerState{
 		ControllerID:        binding.NewInt(),
 		BatteryValue:        binding.NewFloat(),
 		State:               binding.NewString(),
 		LastActivityBinding: binding.NewString(),
 		Mac:                 binding.NewString(),
-		SelectedDuration:    binding.NewString(),
 		DeadzoneValue:       binding.NewFloat(),
 		LedPlayerPreference: binding.NewInt(),
 		LedRGBPreference:    binding.NewInt(),
 		LedRGBStaticColor:   binding.NewString(),
+		GlobalState:         globalState,
 	}
 
 	err := state.ControllerID.Set(id)
@@ -64,14 +64,6 @@ func CreateNewControllerTab(path string, conf *config.Config, ctrlConf *config.C
 		if err != nil {
 			fmt.Println("Error setting LED RGB static color:", err)
 		}
-	}
-	initialValue := fmt.Sprintf("%d min", conf.IdleMinutes)
-	if conf.IdleMinutes == 0 {
-		initialValue = "Jamais"
-	}
-	err = state.SelectedDuration.Set(initialValue)
-	if err != nil {
-		fmt.Println("Error setting selected duration:", err)
 	}
 
 	activityChan := make(chan time.Time)
