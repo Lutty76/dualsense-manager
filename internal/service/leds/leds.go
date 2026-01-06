@@ -87,7 +87,6 @@ func RunRGBChargingAnimation(ctx context.Context, hidPath string, batteryLevel c
 
 			r := int(float64(baseR) * brightness)
 			g := int(float64(baseG) * brightness)
-
 			SetLightbarRGB(hidPath, r, g, 0)
 
 			theta += 0.1
