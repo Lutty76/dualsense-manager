@@ -48,8 +48,8 @@ func main() {
 
 	if desk, ok := myApp.(desktop.App); ok {
 		menu := fyne.NewMenu("DualSense",
-			fyne.NewMenuItem("Afficher", func() { myWindow.Show() }),
-			fyne.NewMenuItem("Quitter", func() { myApp.Quit() }),
+			fyne.NewMenuItem("Display", func() { myWindow.Show() }),
+			fyne.NewMenuItem("Quit", func() { myApp.Quit() }),
 		)
 		desk.SetSystemTrayMenu(menu)
 		desk.SetSystemTrayIcon(resourceIconPng)

@@ -32,6 +32,7 @@ func ManageBatteryAndLEDs(ctx context.Context, _ fyne.App, state *ui.ControllerS
 	var animCancelRGB context.CancelFunc = func() {}
 	var animActivePlayer bool
 	var animActiveRGB bool
+	var firstIteration = true
 	batteryChan := make(chan float64)
 	previousLevel := -1
 
@@ -81,13 +82,14 @@ func ManageBatteryAndLEDs(ctx context.Context, _ fyne.App, state *ui.ControllerS
 			if err != nil {
 				log.Default().Println("Error setting state text:", err)
 			}
-			if level != previousLevel {
+			if level != previousLevel || firstIteration {
 				select {
 				case batteryChan <- float64(level):
+					firstIteration = false
 				default:
 				}
 
-				if level <= state.GlobalState.BatteryAlert && state.GlobalState.BatteryAlert != 0 {
+				if level <= state.GlobalState.BatteryAlert && state.GlobalState.BatteryAlert != 0 && status != "Charging" {
 					log.Default().Printf("Battery low (%d%%) for controller at path: %s\n", level, path)
 					fyne.CurrentApp().SendNotification(&fyne.Notification{
 						Title:   "DualSense Battery Low",
@@ -127,26 +129,20 @@ func ManageBatteryAndLEDs(ctx context.Context, _ fyne.App, state *ui.ControllerS
 				}
 
 			}
-
 			if status == "Charging" && (rgbPref == ui.RGBModeBattery) {
 				if !animActiveRGB {
+
 					var animCtxRGB context.Context
 					animCtxRGB, animCancelRGB = context.WithCancel(ctx)
 					animActiveRGB = true
 					go leds.RunRGBChargingAnimation(animCtxRGB, path, batteryChan)
-					if level != previousLevel {
-						select {
-						case batteryChan <- float64(level):
-							previousLevel = level
-						default:
-						}
-					}
 				}
 			} else {
 				if animActiveRGB {
 					animCancelRGB()
 					animCancelRGB = func() {}
 					animActiveRGB = false
+					firstIteration = true
 				}
 
 				switch rgbPref {
