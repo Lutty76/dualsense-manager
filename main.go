@@ -4,6 +4,7 @@ package main
 import (
 	"dualsense/internal/config"
 	"dualsense/internal/service"
+	"dualsense/internal/service/leds"
 	"dualsense/internal/ui"
 	"flag"
 	"log"
@@ -27,6 +28,8 @@ func main() {
 	flag.BoolVar(debugPtr, "d", false, "Enable debug logging (shorthand)")
 	versionPtr := flag.Bool("version", false, "Show version information")
 	flag.BoolVar(versionPtr, "v", false, "Show version information (shorthand)")
+	cliPtr := flag.Bool("cli", false, "Run in CLI mode without UI")
+	flag.BoolVar(cliPtr, "c", false, "Run in CLI mode without UI (shorthand)")
 
 	flag.Parse()
 
@@ -60,35 +63,43 @@ func main() {
 	})
 
 	service.Debug = *debugPtr
+	leds.Debug = *debugPtr
 
 	globalState := &ui.GlobalState{
 		DelayIdleMinutes: conf.IdleMinutes,
 		BatteryAlert:     conf.BatteryAlert,
 	}
 
-	controllerTabs := service.StartControllerManager(myApp, globalState, conf)
+	if *cliPtr {
+		log.Default().Println("Starting in CLI mode without UI")
+		service.StartControllerManagerCLI(conf)
 
-	selectBatteryWidget := ui.CreateBatteryWidget(globalState, conf)
-	selectDelayWidget := ui.CreateDelayIdleSelect(globalState, conf)
-
-	thickSeparator := canvas.NewRectangle(theme.Color(theme.ColorNameShadow))
-	thickSeparator.SetMinSize(fyne.NewSize(0, 3))
-
-	bottomControls := container.NewVBox(
-		thickSeparator,
-		container.NewBorder(nil, nil, widget.NewLabel("Battery alert :"), nil, selectBatteryWidget),
-		container.NewBorder(nil, nil, widget.NewLabel("Delay :"), nil, selectDelayWidget),
-	)
-
-	appContainer := container.NewBorder(nil, bottomControls, nil, nil, container.NewStack(controllerTabs))
-
-	myWindow.SetContent(appContainer)
-	myWindow.Resize(fyne.NewSize(300, 550))
-
-	if *hidePtr {
-		// start the application hidden: run app loop without showing the window
-		myApp.Run()
 	} else {
-		myWindow.ShowAndRun()
+
+		controllerTabs := service.StartControllerManager(globalState, conf)
+
+		selectBatteryWidget := ui.CreateBatteryWidget(globalState, conf)
+		selectDelayWidget := ui.CreateDelayIdleSelect(globalState, conf)
+
+		thickSeparator := canvas.NewRectangle(theme.Color(theme.ColorNameShadow))
+		thickSeparator.SetMinSize(fyne.NewSize(0, 3))
+
+		bottomControls := container.NewVBox(
+			thickSeparator,
+			container.NewBorder(nil, nil, widget.NewLabel("Battery alert :"), nil, selectBatteryWidget),
+			container.NewBorder(nil, nil, widget.NewLabel("Delay :"), nil, selectDelayWidget),
+		)
+
+		appContainer := container.NewBorder(nil, bottomControls, nil, nil, container.NewStack(controllerTabs))
+
+		myWindow.SetContent(appContainer)
+		myWindow.Resize(fyne.NewSize(300, 500))
+
+		if *hidePtr {
+			// start the application hidden: run app loop without showing the window
+			myApp.Run()
+		} else {
+			myWindow.ShowAndRun()
+		}
 	}
 }

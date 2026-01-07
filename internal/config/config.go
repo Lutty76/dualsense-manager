@@ -19,10 +19,10 @@ type Config struct {
 
 // ControllerConfig holds per-controller configuration overrides.
 type ControllerConfig struct {
-	Deadzone            int    `yaml:"deadzone,omitempty"`
-	LedPlayerPreference int    `yaml:"led_player,omitempty"`
-	LedRGBPreference    int    `yaml:"led_indicator,omitempty"`
-	LedRGBStatic        string `yaml:"led_rgb_static,omitempty"`
+	Deadzone            int    `yaml:"deadzone"`
+	LedPlayerPreference int    `yaml:"led_player"`
+	LedRGBPreference    int    `yaml:"led_indicator"`
+	LedRGBStatic        string `yaml:"led_rgb_static"`
 }
 
 // ControllerConfig returns the configuration for a specific controller MAC.
@@ -43,7 +43,7 @@ func (c *Config) ControllerConfig(mac string) *ControllerConfig {
 		if cc.Deadzone != 0 {
 			res.Deadzone = cc.Deadzone
 		}
-		if cc.LedPlayerPreference != 0 {
+		if cc.LedPlayerPreference != 1 {
 			res.LedPlayerPreference = cc.LedPlayerPreference
 		}
 		if cc.LedRGBPreference != 0 {
@@ -56,7 +56,7 @@ func (c *Config) ControllerConfig(mac string) *ControllerConfig {
 
 	return res
 }
-func SaveControllerConfig(mac string, conf *Config, update func(*ControllerConfig)) {
+func SaveControllerConfig(mac string, conf *Config, newCtrlConf *ControllerConfig) {
 
 	if mac == "" {
 		return
@@ -64,9 +64,8 @@ func SaveControllerConfig(mac string, conf *Config, update func(*ControllerConfi
 	if conf.Controllers == nil {
 		conf.Controllers = map[string]ControllerConfig{}
 	}
-	cc := conf.Controllers[mac]
-	update(&cc)
-	conf.Controllers[mac] = cc
+
+	conf.Controllers[mac] = *newCtrlConf
 	err := Save(conf)
 	if err != nil {
 		log.Default().Println("Error saving controller config for", mac, ":", err)
