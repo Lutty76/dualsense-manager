@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"dualsense/internal/config"
 	"dualsense/internal/ui"
 
 	"fyne.io/fyne/v2/app"
@@ -46,6 +47,9 @@ func TestMonitorJoystickReceivesActivity(t *testing.T) {
 	// create a Fyne app so binding.Set doesn't panic when it uses fyne.Do
 	fyApp := app.New()
 	defer fyApp.Quit()
+	ctrlConf := config.ControllerConfig{
+		Deadzone: 5000,
+	}
 
 	state := &ui.ControllerState{
 		DeadzoneValue: binding.NewFloat(),
@@ -54,7 +58,7 @@ func TestMonitorJoystickReceivesActivity(t *testing.T) {
 	_ = state.DeadzoneValue.Set(100)
 
 	// Run monitor in background
-	go MonitorJoystick("/dev/fakejs0", activityChan, state)
+	go MonitorJoystick("/dev/fakejs0", activityChan, &ctrlConf)
 
 	// Wait for up to 1s to receive at least one activity
 	timeout := time.After(1 * time.Second)

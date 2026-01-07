@@ -1,7 +1,7 @@
 package service
 
 import (
-	"dualsense/internal/ui"
+	"dualsense/internal/config"
 	"encoding/binary"
 	"io"
 	"log"
@@ -16,7 +16,7 @@ var OpenJoystick = func(path string) (io.ReadCloser, error) {
 }
 
 // MonitorJoystick reads joystick events and notifies activity via activityChan.
-func MonitorJoystick(path string, activityChan chan time.Time, state *ui.ControllerState) {
+func MonitorJoystick(path string, activityChan chan time.Time, ctrlConf *config.ControllerConfig) {
 	if Debug {
 		log.Default().Println("Starting joystick monitor for controller at path:", path)
 	}
@@ -41,11 +41,7 @@ func MonitorJoystick(path string, activityChan chan time.Time, state *ui.Control
 				break
 			}
 
-			val, err := state.DeadzoneValue.Get()
-			if err != nil {
-				val = 1500
-			}
-			deadzone := int16(val)
+			deadzone := int16(ctrlConf.Deadzone)
 
 			evType := buffer[6]
 			evValue := int16(binary.LittleEndian.Uint16(buffer[4:6]))

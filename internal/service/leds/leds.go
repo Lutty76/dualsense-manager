@@ -11,6 +11,11 @@ import (
 	"dualsense/internal/sysfs"
 )
 
+var (
+	// Debug enables debug logging within the leds package.
+	Debug bool
+)
+
 // Leds interface defines methods to control DualSense LEDs.
 type Leds interface {
 	RunChargingAnimation(ctx context.Context, jsPath string)
@@ -23,6 +28,9 @@ type Leds interface {
 
 // RunChargingAnimation animates player LEDs to indicate charging progress.
 func RunChargingAnimation(ctx context.Context, jsPath string) {
+	if Debug {
+		fmt.Printf("Starting charging animation on %s\n", jsPath)
+	}
 	ticker := time.NewTicker(800 * time.Millisecond) // Vitesse de l'animation
 	defer ticker.Stop()
 
@@ -99,6 +107,9 @@ func RunRGBChargingAnimation(ctx context.Context, hidPath string, batteryLevel c
 
 // SetBatteryColor sets the RGB lightbar color based on battery percent.
 func SetBatteryColor(jsPath string, percent float64) {
+	if Debug {
+		fmt.Printf("Setting battery color for %.2f%% battery\n", percent)
+	}
 	var r, g int
 	if percent > 50 {
 		r = int(255 * (100 - percent) / 50)
@@ -112,6 +123,9 @@ func SetBatteryColor(jsPath string, percent float64) {
 
 // SetBatteryLeds updates the player LEDs to represent battery level.
 func SetBatteryLeds(jsPath string, percent float64) {
+	if Debug {
+		fmt.Printf("Setting battery LEDs for %.2f%% battery\n", percent)
+	}
 	ledBase := getLedPath(jsPath)
 
 	var p15 string
@@ -162,6 +176,9 @@ func SetBatteryLeds(jsPath string, percent float64) {
 
 // SetPlayerNumber updates the player LEDs to indicate controller number.
 func SetPlayerNumber(jsPath string, id int) {
+	if Debug {
+		fmt.Printf("Setting player LED number to %d\n", id)
+	}
 	ledBase := getLedPath(jsPath)
 
 	playerNum := id
@@ -188,6 +205,10 @@ func SetPlayerNumber(jsPath string, id int) {
 }
 
 func applyLed(basePath, ledName, value string) {
+	if Debug {
+		fmt.Printf("Applying LED %s with value %s\n", ledName, value)
+	}
+
 	matches, err := sysfs.FS.Glob(fmt.Sprintf("%s/*:%s", basePath, ledName))
 	if err != nil {
 		return
@@ -219,6 +240,9 @@ func getLedPath(jsPath string) string {
 
 // SetLightbarRGB sets the multi_intensity and brightness of the RGB lightbar.
 func SetLightbarRGB(jsPath string, r, g, b int) {
+	if Debug {
+		fmt.Printf("Setting lightbar RGB to (%d, %d, %d)\n", r, g, b)
+	}
 	basePath := getLedPath(jsPath)
 	matches, err := sysfs.FS.Glob(fmt.Sprintf("%s/*:rgb:indicator", basePath))
 	if err != nil {

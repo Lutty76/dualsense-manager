@@ -37,6 +37,7 @@ type ControllerState struct {
 	LedRGBPreference    binding.Int
 	LedRGBStaticColor   binding.String
 	GlobalState         *GlobalState
+	Status              string
 }
 
 // Player and RGB modes used in UI selections.
@@ -75,9 +76,9 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 	}
 
 	deadzoneLabel, deadzoneSlider := createDeadzoneInput(state, mac, conf, ctrlConf)
-	ledSelect := createPlayerLedSelect(state, mac, conf)
-	rgbSelect := createRgbLedSelect(state, ctrlConf)
-	staticColorContainer := createStaticColorContainer(state, mac, conf)
+	ledSelect := createPlayerLedSelect(state, mac, conf, ctrlConf)
+	rgbSelect := createRgbLedSelect(state, mac, conf, ctrlConf)
+	staticColorContainer := createStaticColorContainer(state, mac, conf, ctrlConf)
 
 	currentIDRGB, err := state.LedRGBPreference.Get()
 	if err != nil {
@@ -98,7 +99,8 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 					log.Default().Println("Error setting LED RGB preference:", err)
 				}
 				if mac != "" {
-					config.SaveControllerConfig(mac, conf, func(cc *config.ControllerConfig) { cc.LedRGBPreference = id })
+					ctrlConf.LedRGBPreference = id
+					config.SaveControllerConfig(mac, conf, ctrlConf)
 				}
 				if id == RGBModeStatic {
 					staticColorContainer.Show()
@@ -147,8 +149,8 @@ func createDeadzoneInput(state *ControllerState, mac string, conf *config.Config
 			if err != nil {
 				log.Default().Println("Error setting deadzone value:", err)
 			}
-
-			config.SaveControllerConfig(mac, conf, func(cc *config.ControllerConfig) { cc.Deadzone = val })
+			ctrlConf.Deadzone = val
+			config.SaveControllerConfig(mac, conf, ctrlConf)
 		}
 	}
 
@@ -156,11 +158,19 @@ func createDeadzoneInput(state *ControllerState, mac string, conf *config.Config
 
 }
 
-func createPlayerLedSelect(state *ControllerState, mac string, conf *config.Config) *widget.Select {
+func createPlayerLedSelect(state *ControllerState, mac string, conf *config.Config, ctrlConf *config.ControllerConfig) *widget.Select {
 
 	names := []string{playerOptions[0], playerOptions[1]}
 
-	ledSelect := widget.NewSelect(names, func(selected string) {
+	ledSelect := widget.NewSelect(names, nil)
+	if ctrlConf != nil {
+
+		err := state.LedPlayerPreference.Set(ctrlConf.LedPlayerPreference)
+		if err != nil {
+			fmt.Println("Error setting LED player preference:", err)
+		}
+	}
+	ledSelect.OnChanged = func(selected string) {
 		for id, name := range playerOptions {
 			if name == selected {
 				err := state.LedPlayerPreference.Set(id)
@@ -168,12 +178,13 @@ func createPlayerLedSelect(state *ControllerState, mac string, conf *config.Conf
 					log.Default().Println("Error setting LED player preference:", err)
 				}
 				if mac != "" {
-					config.SaveControllerConfig(mac, conf, func(cc *config.ControllerConfig) { cc.LedPlayerPreference = id })
+					ctrlConf.LedPlayerPreference = id
+					config.SaveControllerConfig(mac, conf, ctrlConf)
 				}
 				break
 			}
 		}
-	})
+	}
 
 	currentID, err := state.LedPlayerPreference.Get()
 	if err != nil {
@@ -184,7 +195,7 @@ func createPlayerLedSelect(state *ControllerState, mac string, conf *config.Conf
 	return ledSelect
 }
 
-func createRgbLedSelect(state *ControllerState, ctrlConf *config.ControllerConfig) *widget.Select {
+func createRgbLedSelect(state *ControllerState, mac string, conf *config.Config, ctrlConf *config.ControllerConfig) *widget.Select {
 
 	namesRgb := []string{rgbOptions[0], rgbOptions[1], rgbOptions[2]}
 
@@ -192,13 +203,21 @@ func createRgbLedSelect(state *ControllerState, ctrlConf *config.ControllerConfi
 
 	// initialize state bindings from controller config only when MAC present
 	if ctrlConf != nil {
-		_ = state.DeadzoneValue.Set(float64(ctrlConf.Deadzone))
-		_ = state.LedPlayerPreference.Set(ctrlConf.LedPlayerPreference)
-		_ = state.LedRGBPreference.Set(ctrlConf.LedRGBPreference)
+		err := state.DeadzoneValue.Set(float64(ctrlConf.Deadzone))
+		if err != nil {
+			fmt.Println("Error setting deadzone value:", err)
+		}
+		err = state.LedRGBPreference.Set(ctrlConf.LedRGBPreference)
+		if err != nil {
+			fmt.Println("Error setting LED RGB preference:", err)
+		}
 		// only populate static color binding from config when the binding is empty
 		if ctrlConf.LedRGBStatic != "" {
 			if cur, err := state.LedRGBStaticColor.Get(); err != nil || cur == "" {
-				_ = state.LedRGBStaticColor.Set(strings.TrimPrefix(ctrlConf.LedRGBStatic, "#"))
+				err = state.LedRGBStaticColor.Set(strings.TrimPrefix(ctrlConf.LedRGBStatic, "#"))
+				if err != nil {
+					fmt.Println("Error setting LED RGB static color:", err)
+				}
 			}
 		}
 	}
@@ -213,7 +232,7 @@ func createRgbLedSelect(state *ControllerState, ctrlConf *config.ControllerConfi
 
 }
 
-func createStaticColorContainer(state *ControllerState, mac string, conf *config.Config) *fyne.Container {
+func createStaticColorContainer(state *ControllerState, mac string, conf *config.Config, ctrlConf *config.ControllerConfig) *fyne.Container {
 
 	staticColorEntry := widget.NewEntryWithData(state.LedRGBStaticColor)
 	staticColorEntry.SetPlaceHolder("FFFFFF")
@@ -234,7 +253,10 @@ func createStaticColorContainer(state *ControllerState, mac string, conf *config
 			staticColorEntry.SetText(norm)
 		}
 		// ensure the state binding holds the normalized value
-		_ = state.LedRGBStaticColor.Set(norm)
+		err := state.LedRGBStaticColor.Set(norm)
+		if err != nil {
+			log.Default().Println("Error setting LED RGB static color:", err)
+		}
 
 		// cancel pending save if input is invalid; show validation hint
 		if !hexRegex.MatchString(norm) {
@@ -251,13 +273,14 @@ func createStaticColorContainer(state *ControllerState, mac string, conf *config
 		if hexSaveTimer != nil {
 			hexSaveTimer.Stop()
 		}
-		// capture current normalized value for the save closure
-		val := norm
+
 		hexSaveTimer = time.AfterFunc(saveDebounce, func() {
 			if mac == "" {
 				return
 			}
-			config.SaveControllerConfig(mac, conf, func(cc *config.ControllerConfig) { cc.LedRGBStatic = "#" + val })
+			ctrlConf.LedRGBStatic = "#" + norm
+
+			config.SaveControllerConfig(mac, conf, ctrlConf)
 		})
 	}
 	staticColorContainer := container.NewBorder(nil, nil, widget.NewLabel("Static Color Hex (RRGGBB): "), nil, container.NewVBox(staticColorEntry, validationLabel))
