@@ -51,7 +51,6 @@ func CreateNewControllerTab(globalState *GlobalState, path string, conf *config.
 	if err != nil {
 		fmt.Println("Error setting LED RGB preference:", err)
 	}
-	fmt.Println("Setting LED player preference to:", ctrlConf.LedPlayerPreference)
 	err = state.LedPlayerPreference.Set(ctrlConf.LedPlayerPreference)
 	if err != nil {
 		fmt.Println("Error setting LED player preference:", err)

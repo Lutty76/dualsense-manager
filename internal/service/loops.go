@@ -48,15 +48,10 @@ type LedState struct {
 
 // ManageBatteryAndLEDs handles battery monitoring and LED management for a controller.
 func ManageBatteryAndLEDs(ctx context.Context, state *ui.ControllerState, ctrlConf *config.ControllerConfig, conf *config.Config, path string, id int, storedStatus *string) {
-	var animCancelPlayer context.CancelFunc = func() {}
-	var animCancelRGB context.CancelFunc = func() {}
-	var animActivePlayer bool
-	var animActiveRGB bool
 	var firstIteration = true
 	batteryChan := make(chan float64)
-	previousLevel := -1
 
-	var ledState LedState = LedState{
+	var ledState = LedState{
 		PlayerAnimationActive: false,
 		RGBAnimationActive:    false,
 		CancelPlayerAnim:      func() {},
@@ -73,8 +68,8 @@ func ManageBatteryAndLEDs(ctx context.Context, state *ui.ControllerState, ctrlCo
 	}
 
 	defer func() {
-		animCancelPlayer()
-		animCancelRGB()
+		ledState.CancelPlayerAnim()
+		ledState.CancelRGBAnim()
 		if Debug {
 			log.Default().Println("Stopping battery loop for controller at path:", path)
 		}
@@ -83,8 +78,8 @@ func ManageBatteryAndLEDs(ctx context.Context, state *ui.ControllerState, ctrlCo
 	for {
 		select {
 		case <-ctx.Done():
-			animCancelPlayer()
-			animCancelRGB()
+			ledState.CancelPlayerAnim()
+			ledState.CancelRGBAnim()
 			return
 		default:
 			level, err := battery.ActualBatteryLevel(path)
@@ -123,7 +118,7 @@ func ManageBatteryAndLEDs(ctx context.Context, state *ui.ControllerState, ctrlCo
 			if storedStatus != nil {
 				*storedStatus = status
 			}
-			if level != previousLevel || firstIteration {
+			if level != ledState.PreviousBatteryLevel || firstIteration {
 				select {
 				case batteryChan <- float64(level):
 					firstIteration = false
@@ -137,25 +132,24 @@ func ManageBatteryAndLEDs(ctx context.Context, state *ui.ControllerState, ctrlCo
 						Content: fmt.Sprintf("Controller %d battery is at %d%%", id, level),
 					})
 				}
-				previousLevel = level
 			}
 
 			ledPref := ctrlConf.LedPlayerPreference
 			rgbPref := ctrlConf.LedRGBPreference
 
 			if (ledPref == ui.PlayerModeBattery) && status == "Charging" {
-				if !animActivePlayer {
+				if !ledState.PlayerAnimationActive {
 					var animCtxPlayer context.Context
-					animCtxPlayer, animCancelPlayer = context.WithCancel(ctx)
-					animActivePlayer = true
+					animCtxPlayer, ledState.CancelPlayerAnim = context.WithCancel(ctx)
+					ledState.PlayerAnimationActive = true
 					go leds.RunChargingAnimation(animCtxPlayer, path)
 				}
 
 			} else {
-				if animActivePlayer {
-					animCancelPlayer()
-					animCancelPlayer = func() {}
-					animActivePlayer = false
+				if ledState.PlayerAnimationActive {
+					ledState.CancelPlayerAnim()
+					ledState.CancelPlayerAnim = func() {}
+					ledState.PlayerAnimationActive = false
 				}
 				if ledPref == ui.PlayerModeBattery {
 
@@ -174,18 +168,18 @@ func ManageBatteryAndLEDs(ctx context.Context, state *ui.ControllerState, ctrlCo
 
 			}
 			if status == "Charging" && (rgbPref == ui.RGBModeBattery) {
-				if !animActiveRGB {
+				if !ledState.RGBAnimationActive {
 
 					var animCtxRGB context.Context
-					animCtxRGB, animCancelRGB = context.WithCancel(ctx)
-					animActiveRGB = true
+					animCtxRGB, ledState.CancelRGBAnim = context.WithCancel(ctx)
+					ledState.RGBAnimationActive = true
 					go leds.RunRGBChargingAnimation(animCtxRGB, path, batteryChan)
 				}
 			} else {
-				if animActiveRGB {
-					animCancelRGB()
-					animCancelRGB = func() {}
-					animActiveRGB = false
+				if ledState.RGBAnimationActive {
+					ledState.CancelRGBAnim()
+					ledState.CancelRGBAnim = func() {}
+					ledState.RGBAnimationActive = false
 					firstIteration = true
 				}
 
@@ -397,6 +391,8 @@ func StartControllerManagerCLI(conf *config.Config) {
 			}
 			for id, path := range foundPaths {
 				ctx, cancel := context.WithCancel(context.Background())
+
+				defer cancel()
 				mac := bluetooth.ControllerMAC(path)
 				ctrlConf := conf.ControllerConfig(mac)
 				if _, exists := activeControllers[path]; !exists {
@@ -415,7 +411,6 @@ func StartControllerManagerCLI(conf *config.Config) {
 					go ManageBatteryAndLEDs(ctx, nil, ctrlConf, conf, path, id+1, &activeControllers[path].Status)
 					go StartActivityLoop(ctx, nil, activeControllers[path].ActivityChan, conf, mac, path, &activeControllers[path].Status)
 
-					defer cancel()
 				}
 
 			}

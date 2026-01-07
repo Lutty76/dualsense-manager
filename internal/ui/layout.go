@@ -77,7 +77,7 @@ func CreateContent(conf *config.Config, ctrlConf *config.ControllerConfig, state
 
 	deadzoneLabel, deadzoneSlider := createDeadzoneInput(state, mac, conf, ctrlConf)
 	ledSelect := createPlayerLedSelect(state, mac, conf, ctrlConf)
-	rgbSelect := createRgbLedSelect(state, mac, conf, ctrlConf)
+	rgbSelect := createRgbLedSelect(state, ctrlConf)
 	staticColorContainer := createStaticColorContainer(state, mac, conf, ctrlConf)
 
 	currentIDRGB, err := state.LedRGBPreference.Get()
@@ -195,7 +195,7 @@ func createPlayerLedSelect(state *ControllerState, mac string, conf *config.Conf
 	return ledSelect
 }
 
-func createRgbLedSelect(state *ControllerState, mac string, conf *config.Config, ctrlConf *config.ControllerConfig) *widget.Select {
+func createRgbLedSelect(state *ControllerState, ctrlConf *config.ControllerConfig) *widget.Select {
 
 	namesRgb := []string{rgbOptions[0], rgbOptions[1], rgbOptions[2]}
 
