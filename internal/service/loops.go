@@ -194,6 +194,12 @@ func ManageBatteryAndLEDs(ctx context.Context, state *ui.ControllerState, ctrlCo
 
 						r, g, b := hexToRGB(ctrlConf.LedRGBStatic)
 						leds.SetLightbarRGB(path, r, g, b)
+						// At connection lightbar is not ready immediately; reapply after a short delay.
+						go func() {
+							time.Sleep(3 * time.Second)
+							leds.SetLightbarRGB(path, r, g, b)
+						}()
+
 						ledState.LedRGBMode = ui.RGBModeStatic
 						ledState.RGBColor = ctrlConf.LedRGBStatic
 					}
@@ -414,7 +420,12 @@ func StartControllerManagerCLI(conf *config.Config) {
 				}
 
 			}
-
+			for path, ctrl := range activeControllers {
+				if !pathExists(path) {
+					ctrl.CancelFunc()
+					delete(activeControllers, path)
+				}
+			}
 			time.Sleep(2 * time.Second)
 		}
 	}()

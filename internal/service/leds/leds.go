@@ -118,7 +118,15 @@ func SetBatteryColor(jsPath string, percent float64) {
 		r = 255
 		g = int(255 * percent / 50)
 	}
+
 	SetLightbarRGB(jsPath, r, g, 0)
+
+	// At connection lightbar is not ready immediately; reapply after a short delay.
+	go func() {
+		time.Sleep(3 * time.Second)
+		SetLightbarRGB(jsPath, r, g, 0)
+	}()
+
 }
 
 // SetBatteryLeds updates the player LEDs to represent battery level.
