@@ -12,6 +12,7 @@ A small desktop utility to monitor and manage DualSense controllers on Linux. It
 - Auto-disconnect after inactivity
 - System tray support
 - Verbose logging option
+- CLI mode (preconfigure with ui first, then use flag)
 
 ### Prerequisites
 - libudev and access to `/sys/class/leds` (udev rules below)
@@ -30,6 +31,7 @@ go run .
 - Start hidden in system tray: `./dualsense-mgr -hide` or `-h`
 - Debug logging: `./dualsense-mgr -debug` or `-d`
 - Show version: `./dualsense-mgr -version` or `-v`
+- CLI mode: `./dualsense-mgr -cli` or `-c`
 
 #### Precompiled binary
 A precompiled binary will be provided in the repository release for convenience. You can download that binary and run it directly (ensure it is executable with `chmod +x`).
@@ -59,6 +61,7 @@ This ensures the application (or user processes) can control the controller LEDs
 
 ### Usage
 
+![Screenshot](assets/dualsense-screenshot-empty.png)
 ![Screenshot](assets/dualsense-screenshot.png)
 
 Controller should detected automatically.
@@ -115,3 +118,5 @@ No, there are already excellent tools available for Windows, such as DS4Windows 
 Currently, no. I don’t own a Mac, so I’m unable to develop or test on macOS. However, contributions are welcome if you'd like to help port it.
 #### My controller turns off before the delay time — why?
 Steam has built-in controller management that includes auto-disconnect features. If Steam is running, it may power off your controller before this app’s timer triggers. To fix this, disable auto-disconnect in Steam’s controller settings. Alternatively, if you always use Steam, you may not need this app — Steam already handles most of these functions.
+#### My controller don't set RGB Lightbar color?
+Sometimes the linux driver doesn't set properly the file to manager the lightbar at connection, just turn off and on the controller to fix it. (The universal repair solution ...)
