@@ -155,12 +155,22 @@ func ManageBatteryAndLEDs(ctx context.Context, state *ui.ControllerState, ctrlCo
 
 					if ledState.LedPlayerMode != ui.PlayerModeBattery || ledState.PreviousBatteryLevel != level {
 						leds.SetBatteryLeds(path, float64(level))
+						// Leds is not ready immediately; reapply after a short delay.
+						go func() {
+							time.Sleep(3 * time.Second)
+							leds.SetBatteryLeds(path, float64(level))
+						}()
 						ledState.LedPlayerMode = ui.PlayerModeBattery
 					}
 
 				} else {
 					if ledState.LedPlayerMode != ui.PlayerModeNumber || ledState.PlayerNumber != id {
-						leds.SetPlayerNumber(path, id) // Mode Numéro de manette
+						leds.SetPlayerNumber(path, id)
+						// Leds is not ready immediately; reapply after a short delay.
+						go func() {
+							time.Sleep(3 * time.Second)
+							leds.SetPlayerNumber(path, id)
+						}()
 						ledState.LedPlayerMode = ui.PlayerModeNumber
 						ledState.PlayerNumber = id
 					}
