@@ -118,5 +118,5 @@ No, there are already excellent tools available for Windows, such as DS4Windows 
 Currently, no. I don’t own a Mac, so I’m unable to develop or test on macOS. However, contributions are welcome if you'd like to help port it.
 #### My controller turns off before the delay time — why?
 Steam has built-in controller management that includes auto-disconnect features. If Steam is running, it may power off your controller before this app’s timer triggers. To fix this, disable auto-disconnect in Steam’s controller settings. Alternatively, if you always use Steam, you may not need this app — Steam already handles most of these functions.
-#### My controller don't set RGB Lightbar color?
+#### My controller don't set RGB Lightbar color?
 Sometimes the linux driver doesn't set properly the file to manager the lightbar at connection, just turn off and on the controller to fix it. (The universal repair solution ...)
