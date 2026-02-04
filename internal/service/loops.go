@@ -123,6 +123,7 @@ func ManageBatteryAndLEDs(ctx context.Context, state *ui.ControllerState, ctrlCo
 				case batteryChan <- float64(level):
 					firstIteration = false
 				default:
+					firstIteration = false
 				}
 
 				if level <= conf.BatteryAlert && conf.BatteryAlert != 0 && status != "Charging" {
@@ -183,6 +184,7 @@ func ManageBatteryAndLEDs(ctx context.Context, state *ui.ControllerState, ctrlCo
 					var animCtxRGB context.Context
 					animCtxRGB, ledState.CancelRGBAnim = context.WithCancel(ctx)
 					ledState.RGBAnimationActive = true
+					firstIteration = true
 					go leds.RunRGBChargingAnimation(animCtxRGB, path, batteryChan)
 				}
 			} else {
