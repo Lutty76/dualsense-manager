@@ -8,10 +8,6 @@ import (
 	"time"
 
 	"dualsense/internal/config"
-	"dualsense/internal/ui"
-
-	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/data/binding"
 )
 
 type fakeReadCloser struct {
@@ -30,53 +26,82 @@ func makeEvent(value int16, evType byte, index byte) []byte {
 }
 
 func TestMonitorJoystickReceivesActivity(t *testing.T) {
-	// Prepare two events: a button press and an axis movement above deadzone
-	var buf bytes.Buffer
-	buf.Write(makeEvent(1, 1, 3))    // button
-	buf.Write(makeEvent(2000, 2, 5)) // axis
 
-	// Override OpenJoystick to return our fake reader once, then error
-	orig := OpenJoystick
-	OpenJoystick = func(_ string) (io.ReadCloser, error) {
-		return fakeReadCloser{bytes.NewReader(buf.Bytes())}, nil
+	tests := []struct {
+		name     string
+		events   []byte
+		deadzone int
+		want     int
+	}{
+		{
+			name: "button press",
+			events: func() []byte {
+				var buf bytes.Buffer
+				buf.Write(makeEvent(1, 1, 3)) // button event
+				return buf.Bytes()
+			}(),
+			deadzone: 0,
+			want:     1,
+		},
+		{
+			name: "axis movement above deadzone",
+			events: func() []byte {
+				var buf bytes.Buffer
+				buf.Write(makeEvent(2000, 2, 5)) // axis event above deadzone
+				return buf.Bytes()
+			}(),
+			deadzone: 5000,
+			want:     0,
+		},
+		{
+			name: "axis movement below deadzone",
+			events: func() []byte {
+				var buf bytes.Buffer
+				buf.Write(makeEvent(3000, 2, 5)) // axis event above deadzone
+				return buf.Bytes()
+			}(),
+			deadzone: 2000,
+			want:     1,
+		},
 	}
-	defer func() { OpenJoystick = orig }()
 
-	activityChan := make(chan time.Time, 10)
-
-	// create a Fyne app so binding.Set doesn't panic when it uses fyne.Do
-	fyApp := app.New()
-	defer fyApp.Quit()
-	ctrlConf := config.ControllerConfig{
-		Deadzone: 5000,
-	}
-
-	state := &ui.ControllerState{
-		DeadzoneValue: binding.NewFloat(),
-	}
-	// set low deadzone to ensure axis event counts
-	_ = state.DeadzoneValue.Set(100)
-
-	// Run monitor in background
-	go MonitorJoystick("/dev/fakejs0", activityChan, &ctrlConf)
-
-	// Wait for up to 1s to receive at least one activity
-	timeout := time.After(1 * time.Second)
-	received := 0
-LOOP:
-	for {
-		select {
-		case <-activityChan:
-			received++
-			if received >= 2 {
-				break LOOP
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Override OpenJoystick to return our fake reader once, then error
+			orig := OpenJoystick
+			OpenJoystick = func(_ string) (io.ReadCloser, error) {
+				return fakeReadCloser{bytes.NewReader(tt.events)}, nil
 			}
-		case <-timeout:
-			break LOOP
-		}
-	}
+			defer func() { OpenJoystick = orig }()
 
-	if received == 0 {
-		t.Fatalf("expected at least 1 activity, got %d", received)
+			activityChan := make(chan time.Time, 10)
+
+			ctrlConf := config.ControllerConfig{
+				Deadzone: tt.deadzone,
+			}
+
+			// Run monitor in background
+			go MonitorJoystick("/dev/fakejs0", activityChan, &ctrlConf)
+
+			// Wait for up to 1s to receive expected number of activities
+			timeout := time.After(1 * time.Second)
+			received := 0
+		LOOP:
+			for {
+				select {
+				case <-activityChan:
+					received++
+					if received >= tt.want {
+						break LOOP
+					}
+				case <-timeout:
+					break LOOP
+				}
+			}
+
+			if received != tt.want {
+				t.Fatalf("expected %d activities, got %d", tt.want, received)
+			}
+		})
 	}
 }

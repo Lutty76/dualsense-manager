@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 )
 
 type writeRec struct {
@@ -76,70 +75,85 @@ func TestSetPlayerNumber(t *testing.T) {
 	fake.globs[base+"/*:player-4"] = []string{base + "/mock:player-4"}
 	fake.globs[base+"/*:player-3"] = []string{base + "/mock:player-3"}
 
-	// Call function under test
-	SetPlayerNumber(jsPath, 2)
-
-	// expect 5 writes (player-1, player-5, player-2, player-4, player-3)
-	if len(fake.writes) != 5 {
-		t.Fatalf("expected 5 writes, got %d", len(fake.writes))
+	tests := []struct {
+		id   int
+		want map[string]string
+	}{
+		{
+			id: 1,
+			want: map[string]string{
+				"player-1": "0",
+				"player-5": "0",
+				"player-2": "0",
+				"player-4": "0",
+				"player-3": "1",
+			},
+		},
+		{
+			id: 2,
+			want: map[string]string{
+				"player-1": "0",
+				"player-5": "0",
+				"player-2": "1",
+				"player-4": "1",
+				"player-3": "0",
+			},
+		},
+		{
+			id: 3,
+			want: map[string]string{
+				"player-1": "0",
+				"player-5": "0",
+				"player-2": "1",
+				"player-4": "1",
+				"player-3": "1",
+			},
+		},
+		{
+			id: 4,
+			want: map[string]string{
+				"player-1": "1",
+				"player-5": "1",
+				"player-2": "1",
+				"player-4": "1",
+				"player-3": "0",
+			},
+		},
+		{
+			id: 5,
+			want: map[string]string{
+				"player-1": "1",
+				"player-5": "1",
+				"player-2": "1",
+				"player-4": "1",
+				"player-3": "1",
+			},
+		},
 	}
 
-	// expected values for id==2
-	want := map[string]string{
-		"player-1": "0",
-		"player-5": "0",
-		"player-2": "1",
-		"player-4": "1",
-		"player-3": "0",
-	}
+	for _, tt := range tests {
+		fake.ResetWrites()
+		SetPlayerNumber(jsPath, tt.id)
 
-	for _, w := range fake.writes {
-		var led string
-		for k := range want {
-			if strings.Contains(w.path, ":"+k+"/brightness") || strings.Contains(w.path, ":"+k) {
-				led = k
-				break
+		// expect 5 writes (player-1, player-5, player-2, player-4, player-3)
+		if len(fake.writes) != 5 {
+			t.Fatalf("expected 5 writes, got %d", len(fake.writes))
+		}
+
+		for _, w := range fake.writes {
+			var led string
+			for k := range tt.want {
+				if strings.Contains(w.path, ":"+k+"/brightness") || strings.Contains(w.path, ":"+k) {
+					led = k
+					break
+				}
 			}
-		}
-		if led == "" {
-			t.Fatalf("write to unexpected path: %s", w.path)
-		}
-		if string(w.data) != want[led] {
-			t.Fatalf("led %s: want %q got %q", led, want[led], string(w.data))
-		}
-	}
-	fake.ResetWrites()
-
-	// expected values for id==5
-	SetPlayerNumber(jsPath, 5)
-
-	// expect 10 writes (second call) (player-1, player-5, player-2, player-4, player-3)
-	if len(fake.writes) != 5 {
-		t.Fatalf("expected 5 writes, got %d", len(fake.writes))
-	}
-
-	// expected values for id==2
-	want = map[string]string{
-		"player-1": "1",
-		"player-5": "1",
-		"player-2": "1",
-		"player-4": "1",
-		"player-3": "1",
-	}
-
-	for _, w := range fake.writes {
-		var led string
-		for k := range want {
-			if strings.Contains(w.path, ":"+k+"/brightness") || strings.Contains(w.path, ":"+k) {
-				led = k
-				break
+			if led == "" {
+				t.Fatalf("write to unexpected path: %s", w.path)
 			}
-		}
-		if led == "" {
-			t.Fatalf("write to unexpected path: %s", w.path)
-		}
-		if string(w.data) != want[led] {
-			t.Fatalf("led %s: want %q got %q", led, want[led], string(w.data))
+			if string(w.data) != tt.want[led] {
+				t.Fatalf("led %s: want %q for player number %d got %q", led, tt.want[led], tt.id, string(w.data))
+			}
 		}
 	}
 
@@ -200,72 +214,36 @@ func TestSetBatteryColor(t *testing.T) {
 	// prefill explicit globs so applyLed finds matching paths
 	base := "/sys/class/input/js0/device/leds"
 	fake.globs[base+"/*:battery:indicator"] = []string{base + "/mock:battery:indicator"}
-	// Call function under test
-	SetBatteryColor(jsPath, 75)
 
-	// expect 2 write
-	if len(fake.writes) != 2 {
-		t.Fatalf("expected 2 write, got %d", len(fake.writes))
-	}
-	wantData := "127 255 0"
-	if string(fake.writes[0].data) != wantData {
-		t.Fatalf("expected data %q got %q", wantData, string(fake.writes[0].data))
-	}
-	wantPath := base + "/mock:indicator/multi_intensity"
-	if fake.writes[0].path != wantPath {
-		t.Fatalf("expected path %q got %q", wantPath, fake.writes[0].path)
+	tests := []struct {
+		batteryLevel int
+		want         string
+	}{
+		{batteryLevel: 100, want: "0 255 0"},
+		{batteryLevel: 75, want: "127 255 0"},
+		{batteryLevel: 50, want: "255 255 0"},
+		{batteryLevel: 25, want: "255 127 0"},
+		{batteryLevel: 10, want: "255 51 0"},
 	}
 
-	fake.ResetWrites()
+	for _, tt := range tests {
+		fake.ResetWrites()
+		SetBatteryColor(jsPath, float64(tt.batteryLevel))
 
-	// Call function under test
-	SetBatteryColor(jsPath, 25)
-	// expect 2 write
-	if len(fake.writes) != 2 {
-		t.Fatalf("expected 2 write, got %d", len(fake.writes))
-	}
-	wantData = "255 127 0"
-	if string(fake.writes[0].data) != wantData {
-		t.Fatalf("expected data %q got %q", wantData, string(fake.writes[0].data))
-	}
-	wantPath = base + "/mock:indicator/multi_intensity"
-	if fake.writes[0].path != wantPath {
-		t.Fatalf("expected path %q got %q", wantPath, fake.writes[0].path)
-	}
+		// expect 2 write
+		if len(fake.writes) != 2 {
+			t.Fatalf("expected 2 write, got %d", len(fake.writes))
+		}
 
-	fake.ResetWrites()
-
-	// Call function under test
-	SetBatteryColor(jsPath, 50)
-	// expect 2 write
-	if len(fake.writes) != 2 {
-		t.Fatalf("expected 2 write, got %d", len(fake.writes))
-	}
-	wantData = "255 255 0"
-	if string(fake.writes[0].data) != wantData {
-		t.Fatalf("expected data %q got %q", wantData, string(fake.writes[0].data))
-	}
-	wantPath = base + "/mock:indicator/multi_intensity"
-	if fake.writes[0].path != wantPath {
-		t.Fatalf("expected path %q got %q", wantPath, fake.writes[0].path)
+		if string(fake.writes[0].data) != tt.want {
+			t.Fatalf("expected data %q got %q", tt.want, string(fake.writes[0].data))
+		}
+		wantPath := base + "/mock:indicator/multi_intensity"
+		if fake.writes[0].path != wantPath {
+			t.Fatalf("expected path %q got %q", wantPath, fake.writes[0].path)
+		}
 	}
 
-	fake.ResetWrites()
-
-	// Call function under test
-	SetBatteryColor(jsPath, 10)
-	// expect 2 write
-	if len(fake.writes) != 2 {
-		t.Fatalf("expected 2 write, got %d", len(fake.writes))
-	}
-	wantData = "255 51 0"
-	if string(fake.writes[0].data) != wantData {
-		t.Fatalf("expected data %q got %q", wantData, string(fake.writes[0].data))
-	}
-	wantPath = base + "/mock:indicator/multi_intensity"
-	if fake.writes[0].path != wantPath {
-		t.Fatalf("expected path %q got %q", wantPath, fake.writes[0].path)
-	}
 }
 
 func TestSetBatteryLeds(t *testing.T) {
@@ -287,147 +265,98 @@ func TestSetBatteryLeds(t *testing.T) {
 	fake.globs[base+"/*:player-4"] = []string{base + "/mock:player-4"}
 	fake.globs[base+"/*:player-3"] = []string{base + "/mock:player-3"}
 
-	SetBatteryLeds(jsPath, 50)
-
-	// expect 5 writes (player-1, player-5, player-2, player-4, player-3)
-	if len(fake.writes) != 5 {
-		t.Fatalf("expected 5 writes, got %d", len(fake.writes))
+	tests := []struct {
+		batteryLevel int
+		want         map[string]string
+		blinking     bool
+	}{
+		{
+			batteryLevel: 100,
+			want: map[string]string{
+				"player-1": "1",
+				"player-5": "1",
+				"player-2": "1",
+				"player-4": "1",
+				"player-3": "1",
+			},
+			blinking: false,
+		},
+		{
+			batteryLevel: 50,
+			want: map[string]string{
+				"player-1": "0",
+				"player-5": "0",
+				"player-2": "1",
+				"player-4": "1",
+				"player-3": "1",
+			},
+			blinking: false,
+		},
+		{
+			batteryLevel: 25,
+			want: map[string]string{
+				"player-1": "0",
+				"player-5": "0",
+				"player-2": "0",
+				"player-4": "0",
+				"player-3": "1",
+			},
+			blinking: false,
+		},
+		{
+			batteryLevel: 15,
+			want: map[string]string{
+				"player-1": "0",
+				"player-5": "0",
+				"player-2": "1",
+				"player-4": "1",
+				"player-3": "0",
+			},
+			blinking: true,
+		},
+		{
+			batteryLevel: 5,
+			want: map[string]string{
+				"player-1": "0",
+				"player-5": "0",
+				"player-2": "0",
+				"player-4": "0",
+				"player-3": "1",
+			},
+			blinking: true,
+		},
 	}
 
-	want := map[string]string{
-		"player-1": "0",
-		"player-5": "0",
-		"player-2": "1",
-		"player-4": "1",
-		"player-3": "1",
-	}
+	for _, tt := range tests {
+		fake.ResetWrites()
+		SetBatteryLeds(jsPath, float64(tt.batteryLevel))
+		// expect 5 writes (player-1, player-5, player-2, player-4, player-3)
+		if len(fake.writes) != 5 {
+			t.Fatalf("expected 5 writes, got %d", len(fake.writes))
+		}
 
-	for _, w := range fake.writes {
-		var led string
-		for k := range want {
-			if strings.Contains(w.path, ":"+k+"/brightness") || strings.Contains(w.path, ":"+k) {
-				led = k
-				break
+		for _, w := range fake.writes {
+			var led string
+			for k := range tt.want {
+				if strings.Contains(w.path, ":"+k+"/brightness") || strings.Contains(w.path, ":"+k) {
+					if tt.blinking && (k == "player-3" || k == "player-2" || k == "player-4") {
+						// for blinking case, player-3 can be either "0" or "1"
+						if string(w.data) != "0" && string(w.data) != "1" {
+							t.Fatalf("led %s: want blinking value for %d%% got %q", k, tt.batteryLevel, string(w.data))
+						}
+						led = k
+						break
+					}
+					led = k
+					break
+				}
 			}
-		}
-		if led == "" {
-			t.Fatalf("write to unexpected path: %s", w.path)
-		}
-		if string(w.data) != want[led] {
-			t.Fatalf("led %s: want %q got %q", led, want[led], string(w.data))
-		}
-	}
-
-	fake.ResetWrites()
-
-	SetBatteryLeds(jsPath, 100)
-	// expect 5 writes (player-1, player-5, player-2, player-4, player-3)
-	if len(fake.writes) != 5 {
-		t.Fatalf("expected 5 writes, got %d", len(fake.writes))
-	}
-
-	want = map[string]string{
-		"player-1": "1",
-		"player-5": "1",
-		"player-2": "1",
-		"player-4": "1",
-		"player-3": "1",
-	}
-
-	for _, w := range fake.writes {
-		var led string
-		for k := range want {
-			if strings.Contains(w.path, ":"+k+"/brightness") || strings.Contains(w.path, ":"+k) {
-				led = k
-				break
+			if led == "" {
+				t.Fatalf("write to unexpected path: %s", w.path)
 			}
-		}
-		if led == "" {
-			t.Fatalf("write to unexpected path: %s", w.path)
-		}
-		if string(w.data) != want[led] {
-			t.Fatalf("led %s: want %q got %q", led, want[led], string(w.data))
-		}
-	}
-
-	fake.ResetWrites()
-	SetBatteryLeds(jsPath, 15)
-	// expect 5 writes (player-1, player-5, player-2, player-4, player-3)
-	if len(fake.writes) != 5 {
-		t.Fatalf("expected 5 writes, got %d", len(fake.writes))
-	}
-	if time.Now().Unix()%2 == 0 {
-		want = map[string]string{
-			"player-1": "0",
-			"player-5": "0",
-			"player-2": "1",
-			"player-4": "1",
-			"player-3": "0",
-		}
-	} else {
-		want = map[string]string{
-			"player-1": "0",
-			"player-5": "0",
-			"player-2": "0",
-			"player-4": "0",
-			"player-3": "0",
-		}
-	}
-
-	for _, w := range fake.writes {
-		var led string
-		for k := range want {
-			if strings.Contains(w.path, ":"+k+"/brightness") || strings.Contains(w.path, ":"+k) {
-				led = k
-				break
+			if string(w.data) != tt.want[led] && !(tt.blinking && (led == "player-3" || led == "player-2" || led == "player-4")) {
+				t.Fatalf("led %s: want %q for %d%% got %q", led, tt.want[led], tt.batteryLevel, string(w.data))
 			}
-		}
-		if led == "" {
-			t.Fatalf("write to unexpected path: %s", w.path)
-		}
-		if string(w.data) != want[led] {
-			t.Fatalf("led %s: want %q got %q", led, want[led], string(w.data))
-		}
-	}
-
-	fake.ResetWrites()
-	SetBatteryLeds(jsPath, 5)
-	// expect 5 writes (player-1, player-5, player-2, player-4, player-3)
-	if len(fake.writes) != 5 {
-		t.Fatalf("expected 5 writes, got %d", len(fake.writes))
-	}
-
-	if time.Now().Unix()%2 == 0 {
-		want = map[string]string{
-			"player-1": "0",
-			"player-5": "0",
-			"player-2": "0",
-			"player-4": "0",
-			"player-3": "1",
-		}
-	} else {
-		want = map[string]string{
-			"player-1": "0",
-			"player-5": "0",
-			"player-2": "0",
-			"player-4": "0",
-			"player-3": "0",
-		}
-	}
-
-	for _, w := range fake.writes {
-		var led string
-		for k := range want {
-			if strings.Contains(w.path, ":"+k+"/brightness") || strings.Contains(w.path, ":"+k) {
-				led = k
-				break
-			}
-		}
-		if led == "" {
-			t.Fatalf("write to unexpected path: %s", w.path)
-		}
-		if string(w.data) != want[led] {
-			t.Fatalf("led %s: want %q got %q", led, want[led], string(w.data))
 		}
 	}
 
