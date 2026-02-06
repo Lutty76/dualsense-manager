@@ -21,17 +21,17 @@ A small desktop utility to monitor and manage DualSense controllers on Linux. It
 ### Building
 ```bash
 # From project root
-go build -o dualsense-mgr
+make build
 # Or run directly
 go run .
 ```
 
 ### Running
 - Start normally: `./dualsense-mgr`
-- Start hidden in system tray: `./dualsense-mgr -hide` or `-h`
-- Debug logging: `./dualsense-mgr -debug` or `-d`
-- Show version: `./dualsense-mgr -version` or `-v`
-- CLI mode: `./dualsense-mgr -cli` or `-c`
+- Start minimize in system tray: `./dualsense-mgr --minimize` or `-m`
+- Debug logging: `./dualsense-mgr --debug` or `-d`
+- Show version: `./dualsense-mgr --version` or `-v`
+- CLI mode: `./dualsense-mgr --cli` or `-c`
 
 #### Precompiled binary
 A precompiled binary will be provided in the repository release for convenience. You can download that binary and run it directly (ensure it is executable with `chmod +x`).
@@ -63,6 +63,7 @@ This ensures the application (or user processes) can control the controller LEDs
 
 ![Screenshot](assets/dualsense-screenshot-empty.png)
 ![Screenshot](assets/dualsense-screenshot.png)
+![Screenshot](assets/dualsense-screenshot-2c.png)
 
 Controller should detected automatically.
 
